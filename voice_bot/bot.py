@@ -83,7 +83,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         settings=DeepgramSTTService.Settings.from_mapping(
             {
                 "model": "nova-2",
-                "language": "multi",
+                "language": "hi",
                 "interim_results": True,
                 "smart_format": True,
                 "punctuate": True,
