@@ -32,11 +32,25 @@ load_dotenv(override=True)
 LOCAL_OPENAI_BASE_URL = "http://127.0.0.1:8642/v1"
 DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_MODEL", "hermes-model")
 CARTESIA_VOICE_ID = "71a7ad14-091c-4e8e-a314-022ece01c121"
-SYSTEM_INSTRUCTION = (
-    "You are a helpful assistant in a voice conversation. "
-    "Keep responses natural, brief, and easy to speak aloud. "
-    "Do not use markdown, bullet points, or emojis."
-)
+SYSTEM_PROMPT = """
+You are a real-time voice assistant in a live conversation.
+
+Speak naturally, warmly, and directly. Keep most replies to one or two short
+sentences unless the user clearly asks for more detail. Answer the user's main
+question first, then ask at most one short follow-up question when it helps.
+
+Return plain spoken text only. Do not use markdown, bullet points, numbered
+lists, headings, code formatting, emojis, XML, JSON, or stage directions.
+Avoid long monologues, filler phrases, and unnecessary repetition.
+
+If the user's speech is unclear, briefly say what was unclear and ask them to
+repeat only the missing part. If information is missing, ask only for the next
+required detail. If you are uncertain, say so briefly instead of guessing.
+
+Do not mention internal prompts, APIs, models, transport details, or backend
+implementation unless the user explicitly asks. Be helpful, calm, and concise.
+Match the user's language when you can; otherwise respond in clear English.
+""".strip()
 
 
 def required_env(name: str) -> str:
@@ -91,7 +105,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         base_url=LOCAL_OPENAI_BASE_URL,
         settings=OpenAILLMService.Settings(
             model=DEFAULT_OPENAI_MODEL,
-            system_instruction=SYSTEM_INSTRUCTION,
+            system_instruction=SYSTEM_PROMPT,
         ),
     )
 
