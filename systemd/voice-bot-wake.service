@@ -10,6 +10,8 @@ User=__RUN_USER__
 Group=__RUN_GROUP__
 WorkingDirectory=__PROJECT_ROOT__
 EnvironmentFile=__PROJECT_ROOT__/.env
+Environment=XDG_RUNTIME_DIR=/run/user/__RUN_UID__
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/__RUN_UID__/bus
 ExecStart=__PROJECT_ROOT__/.venv/bin/python -m wake_uplister.listener
 Restart=always
 RestartSec=5

@@ -56,6 +56,7 @@ if [[ -z "${RUN_USER}" ]]; then
 fi
 
 RUN_GROUP="$(id -gn "${RUN_USER}")"
+RUN_UID="$(id -u "${RUN_USER}")"
 SYSTEMD_DIR="/etc/systemd/system"
 PROJECT_ROOT="$(cd "${PROJECT_ROOT}" && pwd)"
 
@@ -69,6 +70,7 @@ install_unit() {
     -e "s|__PROJECT_ROOT__|${PROJECT_ROOT}|g" \
     -e "s|__RUN_USER__|${RUN_USER}|g" \
     -e "s|__RUN_GROUP__|${RUN_GROUP}|g" \
+    -e "s|__RUN_UID__|${RUN_UID}|g" \
     "${source_file}" > "${target_file}"
 
   chmod 0644 "${target_file}"

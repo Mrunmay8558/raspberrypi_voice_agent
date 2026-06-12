@@ -13,6 +13,7 @@ EnvironmentFile=__PROJECT_ROOT__/.env
 ExecStart=__PROJECT_ROOT__/scripts/start_hermes_gateway.sh
 Restart=always
 RestartSec=5
+TimeoutStopSec=210
 
 [Install]
 WantedBy=multi-user.target

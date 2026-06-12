@@ -60,7 +60,7 @@ The repository now includes a separate wake listener that continuously listens o
 
 ```bash
 sudo apt update
-sudo apt install -y libportaudio2 portaudio19-dev
+sudo apt install -y libportaudio2 portaudio19-dev pipewire-alsa
 ```
 
 Then install the Python packages:
@@ -71,7 +71,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-The repository includes a local `tflite-runtime` compatibility stub so this install path also works on Raspberry Pi Python 3.13, where upstream `tflite-runtime` wheels are not available. The wake listener will use `onnxruntime` automatically when `tflite_runtime` cannot be imported.
+The wake listener defaults to the ONNX inference backend because Raspberry Pi Python 3.13 does not have a reliable upstream TFLite runtime wheel for this setup. `openwakeword` includes ONNX support on Linux through its Python dependencies.
 
 ### Start the wake listener manually
 
@@ -81,7 +81,7 @@ source .venv/bin/activate
 python -m wake_uplister.listener
 ```
 
-The listener opens the selected input device at its native sample rate and resamples to 16 kHz for wake-word detection, which avoids Raspberry Pi USB microphone failures on devices that do not support 16 kHz capture directly.
+The listener opens the selected input device at its native sample rate and resamples to 16 kHz for wake-word detection. It feeds openWakeWord 80 ms frames, which is `1280` samples at 16 kHz.
 
 By default, the listener watches for the `hey jarvis` wake word and launches:
 
@@ -101,7 +101,7 @@ The default values come from `config.py`. If you want to override them without e
 - `WAKEWORD_THRESHOLD`: minimum score required to trigger the bot
 - `WAKEWORD_COOLDOWN_SECS`: cooldown after a trigger before another trigger is allowed
 - `WAKEWORD_VAD_THRESHOLD`: speech activity threshold to reduce false positives
-- `WAKEWORD_INFERENCE_FRAMEWORK`: `tflite` or `onnx`
+- `WAKEWORD_INFERENCE_FRAMEWORK`: `onnx` by default for this Raspberry Pi setup, or `tflite` if a compatible runtime is installed
 
 ### Start the wake listener on boot with systemd
 
@@ -127,12 +127,12 @@ The repository now includes a boot stack that can start all required local servi
 
 ### Configure the Hermes gateway command
 
-The startup script reads its default Hermes settings from `config.py`. By default it uses `hermes gateway start` and expects the gateway on `http://127.0.0.1:8642/v1`.
+The startup script reads its default Hermes settings from `config.py`. By default it uses `hermes gateway run --replace` and expects the gateway on `http://127.0.0.1:8642/v1`.
 
 If you want to override that without editing code, you can still set:
 
 ```bash
-HERMES_GATEWAY_COMMAND="hermes gateway start"
+HERMES_GATEWAY_COMMAND="hermes gateway run --replace"
 ```
 
 If that command serves on a port other than `8642`, either change `HERMES_GATEWAY_PORT` to match it and update the bot, or keep the gateway configured to serve on `8642` so the bot can still reach `http://127.0.0.1:8642/v1`.

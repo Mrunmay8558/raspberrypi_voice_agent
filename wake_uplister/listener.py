@@ -30,25 +30,25 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--wakeword-model",
-        default=os.getenv("WAKEWORD_MODEL", DEFAULT_WAKEWORD_MODEL),
+        default=DEFAULT_WAKEWORD_MODEL,
         help="Pretrained openWakeWord model name or a path to a custom model file.",
     )
     parser.add_argument(
         "--threshold",
         type=float,
-        default=float(os.getenv("WAKEWORD_THRESHOLD", str(DEFAULT_THRESHOLD))),
+        default=DEFAULT_THRESHOLD,
         help="Minimum wake-word score required to launch the bot.",
     )
     parser.add_argument(
         "--cooldown-secs",
         type=float,
-        default=float(os.getenv("WAKEWORD_COOLDOWN_SECS", str(DEFAULT_COOLDOWN_SECS))),
+        default=DEFAULT_COOLDOWN_SECS,
         help="Minimum time between wake detections.",
     )
     parser.add_argument(
         "--vad-threshold",
         type=float,
-        default=float(os.getenv("WAKEWORD_VAD_THRESHOLD", str(DEFAULT_VAD_THRESHOLD))),
+        default=DEFAULT_VAD_THRESHOLD,
         help="Silero VAD threshold used to suppress non-speech false positives.",
     )
     parser.add_argument(
@@ -59,7 +59,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--inference-framework",
         choices=["tflite", "onnx"],
-        default=os.getenv("WAKEWORD_INFERENCE_FRAMEWORK", DEFAULT_INFERENCE_FRAMEWORK),
+        default=DEFAULT_INFERENCE_FRAMEWORK,
         help="Inference backend to use for openWakeWord.",
     )
     parser.add_argument(
