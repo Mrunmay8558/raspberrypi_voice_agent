@@ -12,10 +12,15 @@ This bot uses:
 
 ```text
 raspberrypi_voice_agent/
+├── cloudflared/
+├── config.py
 ├── .env.example
 ├── .gitignore
 ├── README.md
 ├── requirements.txt
+├── scripts/
+├── systemd/
+├── wake_uplister/
 └── voice_bot/
     ├── __init__.py
     └── bot.py
@@ -46,3 +51,139 @@ python voice_bot/bot.py
 The bot is pinned to the local OpenAI-compatible gateway on port `8642`, so no remote OpenAI base URL is used.
 
 If your gateway expects a different model name, set `OPENAI_MODEL` before starting the bot.
+
+## Wake word listener for Raspberry Pi 5
+
+The repository now includes a separate wake listener that continuously listens on the Raspberry Pi microphone and starts the Daily bot when a wake word is detected.
+
+### Install additional audio dependencies on Raspberry Pi
+
+```bash
+sudo apt update
+sudo apt install -y libportaudio2 portaudio19-dev
+```
+
+Then install the Python packages:
+
+```bash
+cd raspberrypi_voice_agent
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Start the wake listener manually
+
+```bash
+cd raspberrypi_voice_agent
+source .venv/bin/activate
+python -m wake_uplister.listener
+```
+
+By default, the listener watches for the `hey jarvis` wake word and launches:
+
+```bash
+python -m voice_bot.bot -t daily
+```
+
+Those default Python-side values now live in `config.py`.
+
+If the bot is already running, the listener will not start a second copy.
+
+### Wake listener environment settings
+
+The default values come from `config.py`. If you want to override them without editing code, set these values in `.env`:
+
+- `WAKEWORD_MODEL`: pretrained model name such as `hey jarvis`, `alexa`, or a custom model path
+- `WAKEWORD_THRESHOLD`: minimum score required to trigger the bot
+- `WAKEWORD_COOLDOWN_SECS`: cooldown after a trigger before another trigger is allowed
+- `WAKEWORD_VAD_THRESHOLD`: speech activity threshold to reduce false positives
+- `WAKEWORD_INFERENCE_FRAMEWORK`: `tflite` or `onnx`
+
+### Start the wake listener on boot with systemd
+
+Use the installer script so the systemd units are rendered with your actual project path and Raspberry Pi user:
+
+```bash
+sudo ./scripts/install_boot_services.sh --enable-now
+```
+
+If you only want the wake listener service enabled, you can still enable it by itself after installation:
+
+```bash
+sudo systemctl enable --now voice-bot-wake.service
+```
+
+## Boot stack for reboot recovery
+
+The repository now includes a boot stack that can start all required local services after a Raspberry Pi reboot:
+
+- Hermes gateway service on the local port used by the bot
+- Cloudflare tunnel service that waits until the Hermes port is reachable
+- Wake listener service that keeps listening for the wake word
+
+### Configure the Hermes gateway command
+
+The startup script reads its default Hermes settings from `config.py`. By default it uses `hermes gateway start` and expects the gateway on `http://127.0.0.1:8642/v1`.
+
+If you want to override that without editing code, you can still set:
+
+```bash
+HERMES_GATEWAY_COMMAND="hermes gateway start"
+```
+
+If that command serves on a port other than `8642`, either change `HERMES_GATEWAY_PORT` to match it and update the bot, or keep the gateway configured to serve on `8642` so the bot can still reach `http://127.0.0.1:8642/v1`.
+
+### Configure the Cloudflare tunnel
+
+This setup now uses the direct quick-tunnel form by default:
+
+```bash
+cloudflared tunnel --url http://localhost:8642
+```
+
+The boot script runs that same pattern automatically. By default it targets `http://localhost:8642`.
+
+The startup script reads its default Cloudflare settings from `config.py`. By default it uses:
+
+```bash
+cloudflared tunnel --url http://localhost:8642
+```
+
+If you want a different quick-tunnel target, you can still override it in `.env`:
+
+```bash
+CLOUDFLARED_TARGET_URL=http://localhost:8642
+```
+
+If you do not set `CLOUDFLARED_TARGET_URL`, the script uses `http://localhost:8642` directly.
+
+### Install and enable the full reboot stack
+
+```bash
+cd raspberrypi_voice_agent
+sudo ./scripts/install_boot_services.sh --enable-now
+```
+
+That installs these units:
+
+- `hermes-gateway.service`
+- `cloudflared-hermes-tunnel.service`
+- `voice-bot-wake.service`
+- `voice-assistant-stack.target`
+
+### Control the stack
+
+```bash
+sudo systemctl restart voice-assistant-stack.target
+sudo systemctl status hermes-gateway.service
+sudo systemctl status cloudflared-hermes-tunnel.service
+sudo systemctl status voice-bot-wake.service
+```
+
+### Check logs
+
+```bash
+journalctl -u hermes-gateway.service -f
+journalctl -u cloudflared-hermes-tunnel.service -f
+journalctl -u voice-bot-wake.service -f
+```

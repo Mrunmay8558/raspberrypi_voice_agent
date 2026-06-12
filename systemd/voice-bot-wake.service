@@ -1,0 +1,19 @@
+[Unit]
+Description=Raspberry Pi wake listener for Daily voice bot
+After=network-online.target sound.target hermes-gateway.service
+Wants=network-online.target hermes-gateway.service
+PartOf=voice-assistant-stack.target
+
+[Service]
+Type=simple
+User=__RUN_USER__
+Group=__RUN_GROUP__
+WorkingDirectory=__PROJECT_ROOT__
+EnvironmentFile=__PROJECT_ROOT__/.env
+ExecStart=__PROJECT_ROOT__/.venv/bin/python -m wake_uplister.listener
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+WantedBy=voice-assistant-stack.target

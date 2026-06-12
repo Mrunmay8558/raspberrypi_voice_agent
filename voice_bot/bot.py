@@ -6,7 +6,6 @@
 
 import os
 
-from dotenv import load_dotenv
 from loguru import logger
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -27,11 +26,10 @@ from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.workers.runner import WorkerRunner
 
-load_dotenv(override=True)
+from config import CARTESIA_VOICE_ID
+from config import DEFAULT_OPENAI_MODEL
+from config import LOCAL_OPENAI_BASE_URL
 
-LOCAL_OPENAI_BASE_URL = "http://127.0.0.1:8642/v1"
-DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_MODEL", "hermes-model")
-CARTESIA_VOICE_ID = "71a7ad14-091c-4e8e-a314-022ece01c121"
 SYSTEM_PROMPT = """
 You are a real-time voice assistant in a live conversation.
 

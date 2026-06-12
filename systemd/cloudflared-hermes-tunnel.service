@@ -1,0 +1,19 @@
+[Unit]
+Description=Cloudflare tunnel for Hermes gateway
+After=network-online.target hermes-gateway.service
+Wants=network-online.target hermes-gateway.service
+PartOf=voice-assistant-stack.target
+
+[Service]
+Type=simple
+User=__RUN_USER__
+Group=__RUN_GROUP__
+WorkingDirectory=__PROJECT_ROOT__
+EnvironmentFile=__PROJECT_ROOT__/.env
+ExecStart=__PROJECT_ROOT__/scripts/start_cloudflared_tunnel.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+WantedBy=voice-assistant-stack.target
