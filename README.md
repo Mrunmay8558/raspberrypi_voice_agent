@@ -71,6 +71,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+The repository includes a local `tflite-runtime` compatibility stub so this install path also works on Raspberry Pi Python 3.13, where upstream `tflite-runtime` wheels are not available. The wake listener will use `onnxruntime` automatically when `tflite_runtime` cannot be imported.
+
 ### Start the wake listener manually
 
 ```bash
