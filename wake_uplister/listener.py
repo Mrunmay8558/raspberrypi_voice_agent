@@ -26,7 +26,7 @@ from config import SAMPLE_RATE
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Listen for a wake word and start the Daily bot when detected."
+        description="Listen for a wake word and start the local voice bot when detected."
     )
     parser.add_argument(
         "--wakeword-model",
@@ -66,11 +66,6 @@ def parse_args() -> argparse.Namespace:
         "--pid-file",
         default=str(DEFAULT_PID_FILE),
         help="Path used to track the running bot process.",
-    )
-    parser.add_argument(
-        "--transport",
-        default="daily",
-        help="Transport passed to bot.py via -t. Defaults to daily.",
     )
     parser.add_argument(
         "--debug",
@@ -124,7 +119,7 @@ def looks_like_bot_process(pid: int) -> bool:
     except OSError:
         return True
 
-    return "voice_bot.bot" in cmdline and "-t" in cmdline
+    return "voice_bot.bot" in cmdline
 
 
 def active_bot_pid(pid_file: Path) -> int | None:
@@ -141,13 +136,13 @@ def write_pid(pid_file: Path, pid: int) -> None:
     pid_file.write_text(f"{pid}\n")
 
 
-def start_bot(transport: str, pid_file: Path) -> subprocess.Popen[bytes] | None:
+def start_bot(pid_file: Path) -> subprocess.Popen[bytes] | None:
     current_pid = active_bot_pid(pid_file)
     if current_pid is not None:
         logger.info("Bot already running with pid {}", current_pid)
         return None
 
-    command = [sys.executable, "-m", "voice_bot.bot", "-t", transport]
+    command = [sys.executable, "-m", "voice_bot.bot"]
     process = subprocess.Popen(command, cwd=PROJECT_ROOT, start_new_session=True)
     write_pid(pid_file, process.pid)
     logger.info("Started bot process pid={} command={}", process.pid, " ".join(command))
@@ -283,7 +278,7 @@ def run_listener(args: argparse.Namespace) -> None:
                     loaded_name,
                     score,
                 )
-                launched_process = start_bot(args.transport, pid_file)
+                launched_process = start_bot(pid_file)
                 if launched_process is not None:
                     bot_process = launched_process
                 last_trigger_time = now

@@ -1,5 +1,5 @@
 [Unit]
-Description=Raspberry Pi wake listener for Daily voice bot
+Description=Raspberry Pi wake listener for local voice bot
 After=network-online.target sound.target hermes-gateway.service
 Wants=network-online.target hermes-gateway.service
 PartOf=voice-assistant-stack.target

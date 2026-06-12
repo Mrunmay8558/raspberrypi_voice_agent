@@ -1,10 +1,6 @@
-#
-# Copyright (c) 2024-2026, Daily
-#
-# SPDX-License-Identifier: BSD 2-Clause License
-#
-
 import os
+import argparse
+import asyncio
 
 from loguru import logger
 
@@ -17,18 +13,18 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.runner.types import RunnerArguments
-from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
-from pipecat.transports.daily.transport import DailyParams
+from pipecat.transports.local.audio import LocalAudioTransport
+from pipecat.transports.local.audio import LocalAudioTransportParams
 from pipecat.workers.runner import WorkerRunner
 
 from config import CARTESIA_VOICE_ID
 from config import DEFAULT_OPENAI_MODEL
 from config import LOCAL_OPENAI_BASE_URL
+from config import SAMPLE_RATE
 
 SYSTEM_PROMPT = """
 You are a real-time voice assistant in a live conversation.
@@ -62,16 +58,26 @@ def openai_api_key() -> str:
     return os.getenv("OPENAI_API_KEY") or "local"
 
 
-transport_params = {
-    "daily": lambda: DailyParams(
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-    ),
-}
+def create_bot_transport() -> BaseTransport:
+    return LocalAudioTransport(
+        LocalAudioTransportParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            audio_in_sample_rate=SAMPLE_RATE,
+            audio_out_sample_rate=SAMPLE_RATE,
+            audio_in_channels=1,
+            audio_out_channels=1,
+        )
+    )
 
 
-async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
-    logger.info("Starting Daily voice bot")
+async def run_bot(
+    transport: BaseTransport,
+    *,
+    pipeline_idle_timeout_secs: int = 300,
+    handle_sigint: bool = True,
+):
+    logger.info("Starting voice bot")
 
     stt = DeepgramSTTService(
         api_key=required_env("DEEPGRAM_API_KEY"),
@@ -131,12 +137,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+        idle_timeout_secs=pipeline_idle_timeout_secs,
     )
 
-    @transport.event_handler("on_client_connected")
-    async def on_client_connected(transport, client):
-        logger.info("Client connected")
+    async def start_conversation():
         context.add_message(
             {
                 "role": "user",
@@ -145,24 +149,38 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         )
         await worker.queue_frames([LLMRunFrame()])
 
-    @transport.event_handler("on_client_disconnected")
-    async def on_client_disconnected(transport, client):
-        logger.info("Client disconnected")
-        await worker.cancel()
+    runner = WorkerRunner(handle_sigint=handle_sigint, handle_sigterm=True)
 
-    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    @runner.event_handler("on_ready")
+    async def on_runner_ready():
+        logger.info("Local audio transport ready")
+        await start_conversation()
 
     await runner.add_workers(worker)
     await runner.run()
 
 
-async def bot(runner_args: RunnerArguments):
-    """Main bot entry point for the Raspberry Pi Daily transport bot."""
-    transport = await create_transport(runner_args, transport_params)
-    await run_bot(transport, runner_args)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the Raspberry Pi voice bot directly on local audio devices."
+    )
+    parser.add_argument(
+        "--pipeline-idle-timeout-secs",
+        type=int,
+        default=300,
+        help="Seconds the local audio pipeline may stay idle before shutting down.",
+    )
+    return parser.parse_args()
+
+
+async def main() -> None:
+    args = parse_args()
+    transport = create_bot_transport()
+    await run_bot(
+        transport,
+        pipeline_idle_timeout_secs=args.pipeline_idle_timeout_secs,
+    )
 
 
 if __name__ == "__main__":
-    from pipecat.runner.run import main
-
-    main()
+    asyncio.run(main())

@@ -1,6 +1,6 @@
-# Raspberry Pi Daily Voice Bot
+# Raspberry Pi Local Voice Bot
 
-Minimal Pipecat Daily transport bot for Raspberry Pi 5.
+Minimal Pipecat local-audio voice bot for Raspberry Pi 5.
 
 This bot uses:
 
@@ -54,7 +54,7 @@ If your gateway expects a different model name, set `OPENAI_MODEL` before starti
 
 ## Wake word listener for Raspberry Pi 5
 
-The repository now includes a separate wake listener that continuously listens on the Raspberry Pi microphone and starts the Daily bot when a wake word is detected.
+The repository includes a separate wake listener that continuously listens on the Raspberry Pi microphone and starts the local voice bot when a wake word is detected.
 
 ### Install additional audio dependencies on Raspberry Pi
 
@@ -86,8 +86,12 @@ The listener opens the selected input device at its native sample rate and resam
 By default, the listener watches for the `hey jarvis` wake word and launches:
 
 ```bash
-python -m voice_bot.bot -t daily
+python -m voice_bot.bot
 ```
+
+The bot uses the Raspberry Pi's default PipeWire audio devices, so paired
+AirPods or any configured default microphone/speaker can be used directly
+without opening a browser UI.
 
 Those default Python-side values now live in `config.py`.
 
