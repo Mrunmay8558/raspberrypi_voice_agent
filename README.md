@@ -45,12 +45,19 @@ Fill in the API keys in `.env`.
 ```bash
 cd raspberrypi_voice_agent
 source .venv/bin/activate
-python voice_bot/bot.py
+python -m voice_bot.bot
 ```
 
 The bot is pinned to the local OpenAI-compatible gateway on port `8642`, so no remote OpenAI base URL is used.
 
 If your gateway expects a different model name, set `OPENAI_MODEL` before starting the bot.
+
+The bot has two separate idle controls:
+
+- `--user-idle-timeout-secs`: silence during a conversation before the bot asks whether you are still there
+- `--pipeline-idle-timeout-secs`: worker-level cleanup timeout when the pipeline itself is idle
+
+After repeated user-idle prompts, the bot speaks a short closing message and ends cleanly. The wake listener can then start a fresh bot session on the next wake word.
 
 ## Wake word listener for Raspberry Pi 5
 

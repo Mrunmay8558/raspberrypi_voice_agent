@@ -1,11 +1,21 @@
-import os
 import argparse
 import asyncio
+import os
+import sys
+from pathlib import Path
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from loguru import logger
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame
+from pipecat.frames.frames import (
+    EndFrame,
+    LLMMessagesAppendFrame,
+    LLMRunFrame,
+    TTSSpeakFrame,
+)
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -47,6 +57,55 @@ Match the user's language when you can; otherwise respond in clear English.
 """.strip()
 
 
+INTRODUCTION_PROMPT = "Please introduce yourself briefly and ask how you can help."
+
+
+class UserIdleHandler:
+    """Manage conversational idle prompts before ending a local audio session."""
+
+    def __init__(self, *, max_prompts: int = 3):
+        self._idle_count = 0
+        self._max_prompts = max_prompts
+
+    def reset(self) -> None:
+        self._idle_count = 0
+
+    async def handle_idle(self, aggregator) -> None:
+        self._idle_count += 1
+
+        if self._idle_count == 1:
+            await aggregator.push_frame(
+                LLMMessagesAppendFrame(
+                    [
+                        {
+                            "role": "developer",
+                            "content": (
+                                "The user has been quiet. Briefly ask if they "
+                                "are still there."
+                            ),
+                        }
+                    ],
+                    run_llm=True,
+                )
+            )
+            return
+
+        if self._idle_count < self._max_prompts:
+            await aggregator.push_frame(
+                TTSSpeakFrame(
+                    "Are you still there? I can keep going if you want to continue."
+                )
+            )
+            return
+
+        await aggregator.push_frame(
+            TTSSpeakFrame(
+                "I will stop listening for now. Say the wake word when you need me."
+            )
+        )
+        await aggregator.push_frame(EndFrame())
+
+
 def required_env(name: str) -> str:
     value = os.getenv(name)
     if value:
@@ -75,6 +134,7 @@ async def run_bot(
     transport: BaseTransport,
     *,
     pipeline_idle_timeout_secs: int = 300,
+    user_idle_timeout_secs: float = 20.0,
     handle_sigint: bool = True,
 ):
     logger.info("Starting voice bot")
@@ -116,7 +176,10 @@ async def run_bot(
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+        user_params=LLMUserAggregatorParams(
+            user_idle_timeout=user_idle_timeout_secs,
+            vad_analyzer=SileroVADAnalyzer(),
+        ),
     )
 
     pipeline = Pipeline(
@@ -140,21 +203,29 @@ async def run_bot(
         idle_timeout_secs=pipeline_idle_timeout_secs,
     )
 
-    async def start_conversation():
-        context.add_message(
-            {
-                "role": "user",
-                "content": "Introduce yourself briefly and ask how you can help.",
-            }
-        )
-        await worker.queue_frames([LLMRunFrame()])
+    idle_handler = UserIdleHandler()
+
+    @user_aggregator.event_handler("on_user_turn_idle")
+    async def on_user_turn_idle(aggregator):
+        logger.info("User turn idle")
+        await idle_handler.handle_idle(aggregator)
+
+    @user_aggregator.event_handler("on_user_turn_started")
+    async def on_user_turn_started(_aggregator, _strategy):
+        idle_handler.reset()
 
     runner = WorkerRunner(handle_sigint=handle_sigint, handle_sigterm=True)
 
     @runner.event_handler("on_ready")
-    async def on_runner_ready():
+    async def on_runner_ready(_runner):
         logger.info("Local audio transport ready")
-        await start_conversation()
+        context.add_message(
+            {
+                "role": "developer",
+                "content": INTRODUCTION_PROMPT,
+            }
+        )
+        await worker.queue_frames([LLMRunFrame()])
 
     await runner.add_workers(worker)
     await runner.run()
@@ -168,7 +239,13 @@ def parse_args() -> argparse.Namespace:
         "--pipeline-idle-timeout-secs",
         type=int,
         default=300,
-        help="Seconds the local audio pipeline may stay idle before shutting down.",
+        help="Seconds the pipeline worker may stay idle before process cleanup.",
+    )
+    parser.add_argument(
+        "--user-idle-timeout-secs",
+        type=float,
+        default=20.0,
+        help="Seconds of user silence before the assistant prompts the user.",
     )
     return parser.parse_args()
 
@@ -179,6 +256,7 @@ async def main() -> None:
     await run_bot(
         transport,
         pipeline_idle_timeout_secs=args.pipeline_idle_timeout_secs,
+        user_idle_timeout_secs=args.user_idle_timeout_secs,
     )
 
 
