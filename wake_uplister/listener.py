@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import openwakeword
+import resampy
 import sounddevice as sd
 from loguru import logger
 from openwakeword.model import Model
@@ -180,6 +181,37 @@ def load_wakeword_model(
     return model, loaded_name
 
 
+def resolve_input_device(device: str | None) -> tuple[int | str | None, int, float]:
+    selected_device = device
+    if selected_device is None:
+        default_input_device, _ = sd.default.device
+        if default_input_device is not None and default_input_device >= 0:
+            selected_device = int(default_input_device)
+
+    device_info = sd.query_devices(selected_device, "input")
+    input_sample_rate = float(device_info["default_samplerate"])
+    input_chunk_size = max(1, int(round(input_sample_rate * CHUNK_SIZE / SAMPLE_RATE)))
+
+    logger.info(
+        "Using input device '{}' at {} Hz with chunk size {}",
+        device_info["name"],
+        input_sample_rate,
+        input_chunk_size,
+    )
+
+    return selected_device, input_chunk_size, input_sample_rate
+
+
+def prepare_audio_frame(raw_audio: np.ndarray, input_sample_rate: float) -> np.ndarray:
+    if int(round(input_sample_rate)) == SAMPLE_RATE:
+        return raw_audio
+
+    resampled_audio = resampy.resample(
+        raw_audio.astype(np.float32), input_sample_rate, SAMPLE_RATE
+    )
+    return np.clip(np.round(resampled_audio), -32768, 32767).astype(np.int16)
+
+
 def run_listener(args: argparse.Namespace) -> None:
     pid_file = Path(args.pid_file)
     ensure_runtime_path(pid_file)
@@ -197,9 +229,12 @@ def run_listener(args: argparse.Namespace) -> None:
         args.threshold,
     )
 
+    input_device, input_chunk_size, input_sample_rate = resolve_input_device(args.device)
+
     stop_requested = False
     bot_process: subprocess.Popen[bytes] | None = None
     last_trigger_time = 0.0
+    audio_buffer = np.array([], dtype=np.int16)
 
     def request_stop(signum, _frame):
         nonlocal stop_requested
@@ -210,35 +245,48 @@ def run_listener(args: argparse.Namespace) -> None:
     signal.signal(signal.SIGTERM, request_stop)
 
     with sd.RawInputStream(
-        samplerate=SAMPLE_RATE,
-        blocksize=CHUNK_SIZE,
+        samplerate=input_sample_rate,
+        blocksize=input_chunk_size,
         dtype="int16",
         channels=1,
-        device=args.device,
+        device=input_device,
     ) as stream:
         while not stop_requested:
             bot_process = reap_bot_process(bot_process, pid_file)
-            raw_audio, overflowed = stream.read(CHUNK_SIZE)
+            raw_audio, overflowed = stream.read(input_chunk_size)
             if overflowed:
                 logger.warning("Wake listener audio input overflowed")
 
-            predictions = model.predict(np.frombuffer(raw_audio, dtype=np.int16))
-            score = float(predictions.get(loaded_name, 0.0))
+            prepared_audio = prepare_audio_frame(
+                np.frombuffer(raw_audio, dtype=np.int16), input_sample_rate
+            )
+            audio_buffer = np.concatenate((audio_buffer, prepared_audio))
 
-            logger.debug("Wake-word score {}={:.3f}", loaded_name, score)
+            while audio_buffer.size >= CHUNK_SIZE:
+                frame = audio_buffer[:CHUNK_SIZE]
+                audio_buffer = audio_buffer[CHUNK_SIZE:]
 
-            now = time.monotonic()
-            if score < args.threshold:
-                continue
-            if now - last_trigger_time < args.cooldown_secs:
-                logger.info("Wake word detected but cooldown is still active")
-                continue
+                predictions = model.predict(frame)
+                score = float(predictions.get(loaded_name, 0.0))
 
-            logger.info("Wake word '{}' detected with score {:.3f}", loaded_name, score)
-            launched_process = start_bot(args.transport, pid_file)
-            if launched_process is not None:
-                bot_process = launched_process
-            last_trigger_time = now
+                logger.debug("Wake-word score {}={:.3f}", loaded_name, score)
+
+                now = time.monotonic()
+                if score < args.threshold:
+                    continue
+                if now - last_trigger_time < args.cooldown_secs:
+                    logger.info("Wake word detected but cooldown is still active")
+                    continue
+
+                logger.info(
+                    "Wake word '{}' detected with score {:.3f}",
+                    loaded_name,
+                    score,
+                )
+                launched_process = start_bot(args.transport, pid_file)
+                if launched_process is not None:
+                    bot_process = launched_process
+                last_trigger_time = now
 
 
 def main() -> None:

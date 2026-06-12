@@ -79,6 +79,8 @@ source .venv/bin/activate
 python -m wake_uplister.listener
 ```
 
+The listener opens the selected input device at its native sample rate and resamples to 16 kHz for wake-word detection, which avoids Raspberry Pi USB microphone failures on devices that do not support 16 kHz capture directly.
+
 By default, the listener watches for the `hey jarvis` wake word and launches:
 
 ```bash
