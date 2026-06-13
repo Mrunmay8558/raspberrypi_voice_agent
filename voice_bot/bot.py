@@ -13,11 +13,16 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     EndFrame,
+    Frame,
+    LLMFullResponseEndFrame,
+    LLMFullResponseStartFrame,
     LLMMessagesAppendFrame,
+    TextFrame,
     TTSSpeakFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -34,7 +39,7 @@ from pipecat.workers.runner import WorkerRunner
 
 from config import CARTESIA_VOICE_ID
 from config import DEFAULT_OPENAI_MODEL
-from config import LOCAL_OPENAI_BASE_URL
+from config import OPENAI_BASE_URL
 from config import SAMPLE_RATE
 
 SYSTEM_PROMPT = """
@@ -59,12 +64,68 @@ implementation unless the user explicitly asks. Be helpful, calm, and concise.
 Match the user's language when you can; otherwise respond in clear English.
 
 When the user says they are done, wants to stop, says goodbye, asks to end the
-call, or otherwise clearly wants to finish the session, call the `end_call`
-tool instead of continuing the conversation.
+call, or otherwise clearly wants to finish the session, return exactly
+`__END_CALL__` and no other text. This is a private control command for the
+Raspberry Pi voice pipeline. Do not explain it and do not say it aloud.
 """.strip()
 
 
 INTRODUCTION_PROMPT = "Please introduce yourself briefly and ask how you can help."
+END_CALL_MESSAGE = "Okay, I will stop here. Say the wake word when you need me."
+END_CALL_SENTINEL = "__END_CALL__"
+
+
+class EndCallSentinelProcessor(FrameProcessor):
+    """Suppress the LLM end-call sentinel and stop the local pipeline."""
+
+    def __init__(self):
+        super().__init__()
+        self._buffering = False
+        self._buffered_text = []
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if direction != FrameDirection.DOWNSTREAM:
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, LLMFullResponseStartFrame):
+            self._buffering = True
+            self._buffered_text = []
+            return
+
+        if self._buffering and isinstance(frame, TextFrame):
+            self._buffered_text.append(frame.text)
+            return
+
+        if self._buffering and isinstance(frame, LLMFullResponseEndFrame):
+            text = "".join(self._buffered_text)
+            self._buffering = False
+            self._buffered_text = []
+
+            if END_CALL_SENTINEL in text:
+                logger.info("Ending voice session from LLM sentinel")
+                await self.pipeline_worker.cancel(reason="end call sentinel")
+                return
+
+            if text:
+                await self.push_frame(LLMFullResponseStartFrame(), direction)
+                await self.push_frame(TextFrame(text=text), direction)
+            await self.push_frame(frame, direction)
+            return
+
+        if self._buffering:
+            if not isinstance(frame, TextFrame):
+                await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, TextFrame) and END_CALL_SENTINEL in frame.text:
+            logger.info("Ending voice session from LLM sentinel")
+            await self.pipeline_worker.cancel(reason="end call sentinel")
+            return
+
+        await self.push_frame(frame, direction)
 
 
 class UserIdleHandler:
@@ -124,6 +185,16 @@ def openai_api_key() -> str:
     return os.getenv("OPENAI_API_KEY") or "local"
 
 
+def openai_base_url() -> str:
+    if OPENAI_BASE_URL:
+        return OPENAI_BASE_URL
+    raise ValueError(
+        "Missing OpenAI base URL. In config.py, set LOCAL_VOICE_TESTING = True "
+        "for local Hermes or set CLOUDFLARE_OPENAI_BASE_URL when "
+        "LOCAL_VOICE_TESTING = False."
+    )
+
+
 def create_bot_transport() -> BaseTransport:
     return LocalAudioTransport(
         LocalAudioTransportParams(
@@ -145,12 +216,7 @@ async def end_call(params: FunctionCallParams) -> None:
     """
     logger.info("Ending voice session through end_call tool")
     await params.result_callback({"status": "ending"})
-    await params.pipeline_worker.queue_frames(
-        [
-            TTSSpeakFrame("Okay, I will stop here. Say the wake word when you need me."),
-            EndFrame(),
-        ]
-    )
+    await params.pipeline_worker.cancel(reason="end call tool")
 
 
 async def run_bot(
@@ -189,7 +255,7 @@ async def run_bot(
 
     llm = OpenAILLMService(
         api_key=openai_api_key(),
-        base_url=LOCAL_OPENAI_BASE_URL,
+        base_url=openai_base_url(),
         settings=OpenAILLMService.Settings(
             model=DEFAULT_OPENAI_MODEL,
             system_instruction=SYSTEM_PROMPT,
@@ -212,6 +278,7 @@ async def run_bot(
             stt,
             user_aggregator,
             llm,
+            EndCallSentinelProcessor(),
             tts,
             transport.output(),
             assistant_aggregator,

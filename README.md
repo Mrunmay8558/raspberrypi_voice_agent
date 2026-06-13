@@ -48,7 +48,22 @@ source .venv/bin/activate
 python -m voice_bot.bot
 ```
 
-The bot is pinned to the local OpenAI-compatible gateway on port `8642`, so no remote OpenAI base URL is used.
+By default, the bot uses the local OpenAI-compatible Hermes gateway on
+`http://127.0.0.1:8642/v1`.
+
+Set this in `.env` when testing through the Cloudflare tunnel instead:
+
+```bash
+LOCAL_VOICE_TESTING=false
+```
+
+The Cloudflare URL itself still lives in `config.py`:
+
+```python
+CLOUDFLARE_OPENAI_BASE_URL = "https://your-tunnel.trycloudflare.com/v1"
+```
+
+Set `LOCAL_VOICE_TESTING=true` to switch back to localhost.
 
 If your gateway expects a different model name, set `OPENAI_MODEL` before starting the bot.
 

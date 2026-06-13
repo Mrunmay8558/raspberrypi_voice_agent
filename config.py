@@ -7,10 +7,19 @@ load_dotenv(override=True)
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
+
 DEFAULT_HERMES_GATEWAY_COMMAND = "hermes gateway run --replace"
 DEFAULT_HERMES_HOST = "127.0.0.1"
 DEFAULT_HERMES_PORT = 8642
 LOCAL_OPENAI_BASE_URL = f"http://{DEFAULT_HERMES_HOST}:{DEFAULT_HERMES_PORT}/v1"
+CLOUDFLARE_OPENAI_BASE_URL = "https://tea-referral-multiple-mtv.trycloudflare.com/v1"
+LOCAL_VOICE_TESTING_VALUE = os.getenv("LOCAL_VOICE_TESTING", "true").strip().lower()
+if LOCAL_VOICE_TESTING_VALUE not in {"true", "false"}:
+    raise ValueError("LOCAL_VOICE_TESTING must be either 'true' or 'false'.")
+LOCAL_VOICE_TESTING = LOCAL_VOICE_TESTING_VALUE == "true"
+OPENAI_BASE_URL = (
+    LOCAL_OPENAI_BASE_URL if LOCAL_VOICE_TESTING else CLOUDFLARE_OPENAI_BASE_URL
+)
 DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_MODEL", "hermes-model")
 CARTESIA_VOICE_ID = "71a7ad14-091c-4e8e-a314-022ece01c121"
 
