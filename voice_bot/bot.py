@@ -14,7 +14,6 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     EndFrame,
     LLMMessagesAppendFrame,
-    LLMRunFrame,
     TTSSpeakFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
@@ -86,7 +85,7 @@ class UserIdleHandler:
                 LLMMessagesAppendFrame(
                     [
                         {
-                            "role": "developer",
+                            "role": "user",
                             "content": (
                                 "The user has been quiet. Briefly ask if they "
                                 "are still there."
@@ -244,13 +243,17 @@ async def run_bot(
     @runner.event_handler("on_ready")
     async def on_runner_ready(_runner):
         logger.info("Local audio transport ready")
-        context.add_message(
-            {
-                "role": "user",
-                "content": INTRODUCTION_PROMPT,
-            }
+        await worker.queue_frame(
+            LLMMessagesAppendFrame(
+                [
+                    {
+                        "role": "user",
+                        "content": INTRODUCTION_PROMPT,
+                    }
+                ],
+                run_llm=True,
+            )
         )
-        await worker.queue_frames([LLMRunFrame()])
 
     await runner.add_workers(worker)
     await runner.run()
