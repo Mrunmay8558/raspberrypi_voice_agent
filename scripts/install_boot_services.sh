@@ -79,6 +79,7 @@ install_unit() {
 
 install_unit "${PROJECT_ROOT}/systemd/hermes-gateway.service"
 install_unit "${PROJECT_ROOT}/systemd/cloudflared-hermes-tunnel.service"
+install_unit "${PROJECT_ROOT}/systemd/dashboard.service"
 install_unit "${PROJECT_ROOT}/systemd/voice-bot-wake.service"
 install_unit "${PROJECT_ROOT}/systemd/voice-assistant-stack.target"
 

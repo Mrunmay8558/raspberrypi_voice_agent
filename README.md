@@ -16,6 +16,7 @@ raspberrypi_voice_agent/
 ├── config.py
 ├── .env.example
 ├── .gitignore
+├── dashboard/
 ├── README.md
 ├── requirements.txt
 ├── scripts/
@@ -66,6 +67,54 @@ CLOUDFLARE_OPENAI_BASE_URL = "https://your-tunnel.trycloudflare.com/v1"
 Set `LOCAL_VOICE_TESTING=true` to switch back to localhost.
 
 If your gateway expects a different model name, set `OPENAI_MODEL` before starting the bot.
+
+## Local setup dashboard
+
+The repository includes a local FastAPI dashboard for Raspberry Pi setup and
+maintenance. It is intended for users connected to the same WiFi/LAN as the Pi,
+not for public internet exposure.
+
+Start it manually:
+
+```bash
+cd raspberrypi_voice_agent
+source .venv/bin/activate
+uvicorn dashboard.main:app --host 0.0.0.0 --port 8080
+```
+
+or with the configured `DASHBOARD_HOST` and `DASHBOARD_PORT` values:
+
+```bash
+python -m dashboard.server
+```
+
+Open it from the same network:
+
+```text
+http://raspberrypi.local:8080
+```
+
+or:
+
+```text
+http://<pi-ip-address>:8080
+```
+
+On first run, the dashboard creates a generated admin password and logs it. Check:
+
+```bash
+journalctl -u dashboard.service -n 80 --no-pager
+```
+
+The dashboard currently supports:
+
+- service status
+- WiFi scanning and connection through `nmcli`
+- Bluetooth scanning, pairing, trusting, connecting, and disconnecting through `bluetoothctl`
+- dashboard password change
+
+The password hash is stored in `run/dashboard_auth.json` by default. The plain
+password is not stored.
 
 The bot has two separate idle controls:
 
@@ -196,6 +245,7 @@ sudo ./scripts/install_boot_services.sh --enable-now
 
 That installs these units:
 
+- `dashboard.service`
 - `hermes-gateway.service`
 - `cloudflared-hermes-tunnel.service`
 - `voice-bot-wake.service`
@@ -205,6 +255,7 @@ That installs these units:
 
 ```bash
 sudo systemctl restart voice-assistant-stack.target
+sudo systemctl status dashboard.service
 sudo systemctl status hermes-gateway.service
 sudo systemctl status cloudflared-hermes-tunnel.service
 sudo systemctl status voice-bot-wake.service
@@ -213,6 +264,7 @@ sudo systemctl status voice-bot-wake.service
 ### Check logs
 
 ```bash
+journalctl -u dashboard.service -f
 journalctl -u hermes-gateway.service -f
 journalctl -u cloudflared-hermes-tunnel.service -f
 journalctl -u voice-bot-wake.service -f

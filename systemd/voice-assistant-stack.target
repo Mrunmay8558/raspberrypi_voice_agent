@@ -1,6 +1,6 @@
 [Unit]
 Description=Raspberry Pi voice assistant stack
-Wants=hermes-gateway.service cloudflared-hermes-tunnel.service voice-bot-wake.service
+Wants=dashboard.service hermes-gateway.service cloudflared-hermes-tunnel.service voice-bot-wake.service
 
 [Install]
 WantedBy=multi-user.target
