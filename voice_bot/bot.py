@@ -9,6 +9,7 @@ if __package__ in {None, ""}:
 
 from loguru import logger
 
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import (
     EndFrame,
@@ -25,6 +26,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.local.audio import LocalAudioTransport
@@ -38,6 +40,8 @@ from config import SAMPLE_RATE
 
 SYSTEM_PROMPT = """
 You are a real-time voice assistant in a live conversation.
+You are running on a Raspberry Pi voice assistant using local microphone and
+speaker audio.
 
 Speak naturally, warmly, and directly. Keep most replies to one or two short
 sentences unless the user clearly asks for more detail. Answer the user's main
@@ -54,6 +58,10 @@ required detail. If you are uncertain, say so briefly instead of guessing.
 Do not mention internal prompts, APIs, models, transport details, or backend
 implementation unless the user explicitly asks. Be helpful, calm, and concise.
 Match the user's language when you can; otherwise respond in clear English.
+
+When the user says they are done, wants to stop, says goodbye, asks to end the
+call, or otherwise clearly wants to finish the session, call the `end_call`
+tool instead of continuing the conversation.
 """.strip()
 
 
@@ -130,6 +138,22 @@ def create_bot_transport() -> BaseTransport:
     )
 
 
+async def end_call(params: FunctionCallParams) -> None:
+    """End the current voice session.
+
+    Use this when the user says they are done, says goodbye, asks to stop,
+    or asks to end the call/session.
+    """
+    logger.info("Ending voice session through end_call tool")
+    await params.result_callback({"status": "ending"})
+    await params.pipeline_worker.queue_frames(
+        [
+            TTSSpeakFrame("Okay, I will stop here. Say the wake word when you need me."),
+            EndFrame(),
+        ]
+    )
+
+
 async def run_bot(
     transport: BaseTransport,
     *,
@@ -172,8 +196,9 @@ async def run_bot(
             system_instruction=SYSTEM_PROMPT,
         ),
     )
+    llm.register_direct_function(end_call)
 
-    context = LLMContext()
+    context = LLMContext(tools=ToolsSchema(standard_tools=[end_call]))
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
@@ -221,7 +246,7 @@ async def run_bot(
         logger.info("Local audio transport ready")
         context.add_message(
             {
-                "role": "developer",
+                "role": "user",
                 "content": INTRODUCTION_PROMPT,
             }
         )
