@@ -22,7 +22,7 @@ body {
 .shell {
   width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 32px 0;
+  padding: 24px 0 32px;
 }
 
 .hidden {
@@ -52,9 +52,24 @@ body {
 }
 
 .topbar {
-  margin-bottom: 22px;
-  padding-bottom: 18px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
   border-bottom: 1px solid #25262b;
+}
+
+.topbar-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.topbar-copy h1 {
+  max-width: 820px;
+  font-size: clamp(32px, 5vw, 60px);
+}
+
+.topbar-copy .subtle {
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 h1,
@@ -121,6 +136,11 @@ h2 {
   display: grid;
   gap: 12px;
   margin-top: 18px;
+}
+
+.form-group {
+  display: grid;
+  gap: 12px;
 }
 
 .form.compact {
@@ -200,6 +220,10 @@ button {
 
 button:hover {
   background: #4ade80;
+}
+
+#logout-button {
+  min-width: 88px;
 }
 
 button.secondary,
@@ -315,6 +339,10 @@ button.secondary,
   .panel-header button,
   .topbar button {
     width: 100%;
+  }
+
+  .topbar-copy {
+    gap: 8px;
   }
 
   #app-message {

@@ -44,7 +44,7 @@
 
       <section id="dashboard-panel" class="hidden">
         <header class="topbar">
-          <div>
+          <div class="topbar-copy">
             <p class="eyebrow">Local setup</p>
             <h1>Voice Agent Dashboard</h1>
             <p id="local-url" class="subtle"></p>
@@ -110,7 +110,9 @@
           <article class="panel">
             <div class="panel-header">
               <h2>Voice Runtime</h2>
-              <button id="load-agents" type="button">Load agents</button>
+              <button id="load-agents" type="button" class="hidden">
+                Load agents
+              </button>
             </div>
             <form id="remote-voice-form" class="form compact">
               <label>
@@ -120,43 +122,29 @@
                   <option value="remote_daily">Eigi voice bot</option>
                 </select>
               </label>
-              <label>
-                Eigi API base
+              <div id="remote-runtime-fields" class="form-group hidden">
+                <label>
+                  Agent
+                  <select id="agent-select">
+                    <option value="">Load agents from Eigi</option>
+                  </select>
+                </label>
+                <input id="eigi-agent-id" placeholder="Agent ID" />
+                <textarea
+                  id="dynamic-variables"
+                  rows="6"
+                  placeholder='{"patient_name":"Maya"}'
+                ></textarea>
                 <input
-                  id="public-api-base-url"
-                  placeholder="http://localhost:4000/v1/public"
-                  required
+                  id="conversation-config-type"
+                  placeholder="VOICE"
+                  value="VOICE"
                 />
-              </label>
-              <input
-                id="daily-session-url"
-                placeholder="http://localhost:4000/v1/public/daily"
-                required
-              />
-              <label>
-                Agent
-                <select id="agent-select">
-                  <option value="">Load agents from Eigi</option>
-                </select>
-              </label>
-              <input id="eigi-agent-id" placeholder="Agent ID" />
-              <textarea
-                id="dynamic-variables"
-                rows="6"
-                placeholder='{"patient_name":"Maya"}'
-              ></textarea>
-              <input
-                id="conversation-config-type"
-                placeholder="VOICE"
-                value="VOICE"
-                required
-              />
-              <label class="inline">
-                <input id="is-test-call" type="checkbox" />
-                Test call
-              </label>
-              <input id="native-bin" placeholder="Native binary path" />
-              <input id="native-config-file" placeholder="Native config file" />
+                <label class="inline">
+                  <input id="is-test-call" type="checkbox" />
+                  Test call
+                </label>
+              </div>
               <button type="submit">Save voice runtime</button>
             </form>
             <p id="api-key-preview" class="message"></p>

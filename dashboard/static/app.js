@@ -3,6 +3,10 @@ const dashboardPanel = document.querySelector("#dashboard-panel");
 const loginMessage = document.querySelector("#login-message");
 const appMessage = document.querySelector("#app-message");
 const API_BASE = "/api/v1";
+const runtimeModeSelect = document.querySelector("#runtime-mode");
+const remoteRuntimeFields = document.querySelector("#remote-runtime-fields");
+const loadAgentsButton = document.querySelector("#load-agents");
+let currentRemoteVoiceSettings = {};
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -41,6 +45,12 @@ function showLogin(message = "") {
 
 function setMessage(text) {
   appMessage.textContent = text;
+}
+
+function updateRuntimeVisibility() {
+  const isRemoteRuntime = runtimeModeSelect.value === "remote_daily";
+  remoteRuntimeFields.classList.toggle("hidden", !isRemoteRuntime);
+  loadAgentsButton.classList.toggle("hidden", !isRemoteRuntime);
 }
 
 async function loadStatus() {
@@ -120,11 +130,8 @@ async function loadBluetooth(scan = false) {
 
 async function loadRemoteVoiceSettings() {
   const settings = await request("/remote-voice/settings");
-  document.querySelector("#runtime-mode").value = settings.runtime_mode || "local";
-  document.querySelector("#public-api-base-url").value =
-    settings.public_api_base_url || "";
-  document.querySelector("#daily-session-url").value =
-    settings.daily_session_url || "";
+  currentRemoteVoiceSettings = settings;
+  runtimeModeSelect.value = settings.runtime_mode || "local";
   document.querySelector("#eigi-agent-id").value = settings.agent_id || "";
   document.querySelector("#dynamic-variables").value = JSON.stringify(
     settings.dynamic_variables || {},
@@ -136,13 +143,11 @@ async function loadRemoteVoiceSettings() {
   document.querySelector("#is-test-call").checked = Boolean(
     settings.is_test_call,
   );
-  document.querySelector("#native-bin").value = settings.native_bin || "";
-  document.querySelector("#native-config-file").value =
-    settings.native_config_file || "";
   document.querySelector("#api-key-preview").textContent =
     settings.api_key_configured
       ? `API key loaded from .env: ${settings.api_key_preview}`
       : "API key is not configured. Set EIGI_API_KEY in .env.";
+  updateRuntimeVisibility();
 }
 
 async function loadApiKeyStatus() {
@@ -266,19 +271,12 @@ document
   .querySelector("#scan-bluetooth")
   .addEventListener("click", () => loadBluetooth(true));
 document.querySelector("#load-agents").addEventListener("click", loadAgents);
+runtimeModeSelect.addEventListener("change", updateRuntimeVisibility);
 
 document.querySelector("#agent-select").addEventListener("change", async () => {
   const agentId = document.querySelector("#agent-select").value;
   document.querySelector("#eigi-agent-id").value = agentId;
   await loadDynamicVariables(agentId);
-});
-
-document.querySelector("#public-api-base-url").addEventListener("change", () => {
-  const baseUrl = document.querySelector("#public-api-base-url").value.trim();
-  if (baseUrl) {
-    document.querySelector("#daily-session-url").value =
-      `${baseUrl.replace(/\/$/, "")}/daily`;
-  }
 });
 
 document
@@ -326,23 +324,30 @@ document
       return;
     }
     const agentId = document.querySelector("#eigi-agent-id").value.trim();
+    const isRemoteRuntime = runtimeModeSelect.value === "remote_daily";
     const payload = {
-      runtime_mode: document.querySelector("#runtime-mode").value,
-      public_api_base_url: document.querySelector("#public-api-base-url").value,
-      daily_session_url: document.querySelector("#daily-session-url").value,
-      agent_id: agentId,
-      conversation_metadata: {
-        agent_id: agentId,
-        dynamic_variables: dynamicVariables,
-      },
-      dynamic_variables: dynamicVariables,
+      runtime_mode: runtimeModeSelect.value,
+      public_api_base_url: isRemoteRuntime
+        ? currentRemoteVoiceSettings.public_api_base_url || ""
+        : "",
+      daily_session_url: isRemoteRuntime
+        ? currentRemoteVoiceSettings.daily_session_url || ""
+        : "",
+      agent_id: isRemoteRuntime ? agentId : "",
+      conversation_metadata: isRemoteRuntime
+        ? {
+            agent_id: agentId,
+            dynamic_variables: dynamicVariables,
+          }
+        : {},
+      dynamic_variables: isRemoteRuntime ? dynamicVariables : {},
       conversation_visibility: false,
-      conversation_config_type: document.querySelector(
-        "#conversation-config-type",
-      ).value,
-      is_test_call: document.querySelector("#is-test-call").checked,
-      native_bin: document.querySelector("#native-bin").value,
-      native_config_file: document.querySelector("#native-config-file").value,
+      conversation_config_type: isRemoteRuntime
+        ? document.querySelector("#conversation-config-type").value
+        : "",
+      is_test_call: isRemoteRuntime
+        ? document.querySelector("#is-test-call").checked
+        : false,
     };
     await request("/remote-voice/settings", {
       method: "PUT",
