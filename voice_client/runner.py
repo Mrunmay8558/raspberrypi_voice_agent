@@ -1,3 +1,10 @@
+"""Run the native Daily audio client behind a local session broker.
+
+The native C++ client expects a Daily-compatible `/start` endpoint. This runner
+starts a local FastAPI broker, launches the native binary, and keeps both
+processes tied to the wake-listener session lifecycle.
+"""
+
 import signal
 import subprocess
 import sys
@@ -14,6 +21,7 @@ from voice_client.config_store import load_remote_voice_config
 
 
 def resolve_project_path(path_value: str) -> Path:
+    """Resolve an absolute or project-relative path."""
     path = Path(path_value).expanduser()
     if path.is_absolute():
         return path
@@ -21,6 +29,19 @@ def resolve_project_path(path_value: str) -> Path:
 
 
 def start_native_client(url: str, native_bin: str, config_file: str) -> subprocess.Popen[bytes]:
+    """Launch the native Pipecat Daily client.
+
+    Args:
+        url: Local broker URL passed to the native client's `-b` option.
+        native_bin: Absolute or project-relative native client executable path.
+        config_file: Absolute or project-relative native client JSON config path.
+
+    Returns:
+        The running native client process.
+
+    Raises:
+        RuntimeError: If the executable or config file does not exist.
+    """
     binary = resolve_project_path(native_bin)
     config = resolve_project_path(config_file)
     if not binary.exists():
@@ -37,6 +58,7 @@ def start_native_client(url: str, native_bin: str, config_file: str) -> subproce
 
 
 def run_server() -> subprocess.Popen[bytes]:
+    """Start the local FastAPI broker used by the native client."""
     command = [
         sys.executable,
         "-m",
@@ -52,6 +74,7 @@ def run_server() -> subprocess.Popen[bytes]:
 
 
 def main() -> None:
+    """Run the broker and native client until either exits or receives a signal."""
     configure_logger()
     config = load_remote_voice_config()
     if not config.daily_session_url or not config.api_key or not config.agent_id:
@@ -90,18 +113,23 @@ def main() -> None:
                 return
             time.sleep(1)
     finally:
-        if client_process and client_process.poll() is None:
-            client_process.terminate()
-            try:
-                client_process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                client_process.kill()
-        if server.poll() is None:
-            server.terminate()
-            try:
-                server.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                server.kill()
+        _stop_process(client_process, "native remote voice client")
+        _stop_process(server, "remote voice client broker")
+
+
+def _stop_process(process: subprocess.Popen[bytes] | None, label: str) -> None:
+    """Terminate a subprocess and kill it if graceful shutdown times out."""
+    if process is None or process.poll() is not None:
+        return
+
+    logger.info("Stopping {}", label)
+    process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        logger.warning("{} did not stop in time; killing it", label)
+        process.kill()
+        process.wait(timeout=5)
 
 
 if __name__ == "__main__":

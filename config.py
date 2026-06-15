@@ -1,3 +1,15 @@
+"""Application configuration loader.
+
+Configuration is resolved from, in order:
+
+1. `.env` for secrets and deployment overrides.
+2. ignored local `config.json` when present.
+3. committed `config.example.json` as the default template.
+
+Modules import constants from here so runtime code does not need to understand
+where each value came from.
+"""
+
 import json
 import os
 from copy import deepcopy
@@ -16,15 +28,30 @@ CONFIG_FILE = Path(os.getenv("APP_CONFIG_FILE", str(DEFAULT_CONFIG_FILE)))
 
 
 def _read_json(path: Path) -> dict[str, Any]:
+    """Read a JSON configuration file.
+
+    Args:
+        path: File path to read.
+
+    Returns:
+        Parsed JSON object, or an empty object if the file does not exist.
+
+    Raises:
+        ValueError: If the file exists but is invalid JSON or not an object.
+    """
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text())
+        data = json.loads(path.read_text())
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON config file: {path}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"JSON config file must contain an object: {path}")
+    return data
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Deep-merge two dictionaries without mutating either input."""
     merged = deepcopy(base)
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
@@ -35,6 +62,7 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def _section(name: str) -> dict[str, Any]:
+    """Return one top-level config section."""
     section = APP_CONFIG.get(name, {})
     if not isinstance(section, dict):
         raise ValueError(f"config.json section '{name}' must be an object.")
@@ -42,10 +70,12 @@ def _section(name: str) -> dict[str, Any]:
 
 
 def _get(section: str, key: str, default: Any = None) -> Any:
+    """Return one setting from a named config section."""
     return _section(section).get(key, default)
 
 
 def _env_bool(name: str, default: bool) -> bool:
+    """Read a boolean environment override."""
     value = os.getenv(name)
     if value is None:
         return default
@@ -56,14 +86,25 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 def _env_int(name: str, default: int) -> int:
-    return int(os.getenv(name, str(default)))
+    """Read an integer environment override."""
+    value = os.getenv(name, str(default))
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer.") from exc
 
 
 def _env_float(name: str, default: float) -> float:
-    return float(os.getenv(name, str(default)))
+    """Read a floating-point environment override."""
+    value = os.getenv(name, str(default))
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number.") from exc
 
 
 def _path(value: str | Path) -> Path:
+    """Resolve an absolute or project-relative path."""
     path = Path(value).expanduser()
     if path.is_absolute():
         return path

@@ -1,11 +1,22 @@
+"""WiFi service functions for the dashboard.
+
+This module wraps NetworkManager commands used by the dashboard and converts
+their textual output into structured response models for the controller layer.
+"""
+
 import csv
 from io import StringIO
 
-from dashboard.schemas.wifi import WifiNetwork
-from dashboard.services.command_service import run_command
+from dashboard.core.apis.schemas.responses.wifi_response import WifiNetwork
+from dashboard.core.services.command_service import run_command
 
 
 def scan_networks() -> list[WifiNetwork]:
+    """Scan nearby WiFi networks using NetworkManager.
+
+    Returns:
+        list[WifiNetwork]: Visible WiFi networks ordered by signal strength.
+    """
     output = run_command(
         [
             "nmcli",
@@ -42,6 +53,15 @@ def scan_networks() -> list[WifiNetwork]:
 
 
 def connect_network(ssid: str, password: str) -> str:
+    """Connect to a WiFi network using NetworkManager.
+
+    Args:
+        ssid: WiFi network name.
+        password: WiFi password.
+
+    Returns:
+        str: Output from the NetworkManager connection command.
+    """
     return run_command(
         ["nmcli", "device", "wifi", "connect", ssid, "password", password],
         timeout=45,

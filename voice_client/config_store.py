@@ -1,5 +1,10 @@
+"""Load and persist remote voice client configuration.
+
+Committed JSON files provide sanitized defaults. Runtime selections that can vary
+per device are stored in ignored `user.json`; secrets remain in `.env`.
+"""
+
 import json
-from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,6 +20,24 @@ from env_store import write_env_values
 
 @dataclass
 class RemoteVoiceConfig:
+    """Resolved configuration for remote Eigi voice sessions.
+
+    Parameters:
+        runtime_mode: Wake-listener runtime mode, `local` or `remote_daily`.
+        public_api_base_url: Base URL for Eigi public APIs.
+        daily_session_url: Eigi `/v1/public/daily` URL.
+        api_key: Eigi API key loaded from `.env`.
+        agent_id: Selected Eigi agent ID.
+        conversation_metadata: Metadata sent to the Daily session endpoint.
+        dynamic_variables: Runtime variables included in conversation metadata.
+        conversation_visibility: Whether the created conversation is visible.
+        conversation_config_type: Eigi conversation config type, usually `VOICE`.
+        is_test_call: Whether Eigi should mark the session as a test call.
+        client_type: Remote client implementation. Always `native`.
+        native_bin: Native Daily client executable path.
+        native_config_file: Native Daily client JSON config path.
+    """
+
     runtime_mode: str = "local"
     public_api_base_url: str = ""
     daily_session_url: str = ""
@@ -31,6 +54,11 @@ class RemoteVoiceConfig:
 
 
 def load_remote_voice_config() -> RemoteVoiceConfig:
+    """Load remote voice settings from defaults, user config, and `.env`.
+
+    Returns:
+        Fully resolved remote voice configuration.
+    """
     file_config = _read_config_file(USER_CONFIG_FILE)
     remote_voice = _merge_section(REMOTE_VOICE_CONFIG, file_config.get("remote_voice", {}))
     voice_client = _merge_section(VOICE_CLIENT_CONFIG, file_config.get("voice_client", {}))
@@ -73,6 +101,14 @@ def load_remote_voice_config() -> RemoteVoiceConfig:
 
 
 def save_remote_voice_config(updates: dict[str, Any]) -> RemoteVoiceConfig:
+    """Persist dashboard remote voice updates to ignored local config files.
+
+    Args:
+        updates: Partial remote voice settings from the dashboard.
+
+    Returns:
+        The resolved configuration after applying updates.
+    """
     current = load_remote_voice_config()
     file_config = _read_config_file(USER_CONFIG_FILE)
     runtime = dict(file_config.get("runtime", {}))
@@ -112,13 +148,17 @@ def save_remote_voice_config(updates: dict[str, Any]) -> RemoteVoiceConfig:
     file_config["remote_voice"] = remote_voice
     file_config["voice_client"] = voice_client
 
-    USER_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    USER_CONFIG_FILE.write_text(json.dumps(file_config, indent=2))
-    USER_CONFIG_FILE.chmod(0o600)
+    try:
+        USER_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        USER_CONFIG_FILE.write_text(json.dumps(file_config, indent=2))
+        USER_CONFIG_FILE.chmod(0o600)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to write user config: {USER_CONFIG_FILE}") from exc
     return current if not updates else load_remote_voice_config()
 
 
 def public_remote_voice_config() -> dict[str, str | bool]:
+    """Return remote voice settings safe for dashboard display."""
     config = load_remote_voice_config()
     return {
         "runtime_mode": config.runtime_mode,
@@ -139,6 +179,11 @@ def public_remote_voice_config() -> dict[str, str | bool]:
 
 
 def _read_config_file(path: Path) -> dict[str, Any]:
+    """Read optional user config JSON.
+
+    Invalid or unreadable user config is treated as absent so the dashboard can
+    still boot and allow repair.
+    """
     if not path.exists():
         return {}
     try:
@@ -148,6 +193,7 @@ def _read_config_file(path: Path) -> dict[str, Any]:
 
 
 def _merge_section(defaults: dict[str, Any], overrides: Any) -> dict[str, Any]:
+    """Merge one config section with shallow user overrides."""
     if not isinstance(overrides, dict):
         overrides = {}
     merged = dict(defaults)
@@ -156,6 +202,7 @@ def _merge_section(defaults: dict[str, Any], overrides: Any) -> dict[str, Any]:
 
 
 def _conversation_metadata(remote_voice: dict[str, Any]) -> dict[str, Any]:
+    """Build Eigi conversation metadata from stored remote voice settings."""
     metadata = remote_voice.get("conversation_metadata")
     if not isinstance(metadata, dict):
         metadata = {}
@@ -170,6 +217,7 @@ def _conversation_metadata(remote_voice: dict[str, Any]) -> dict[str, Any]:
 
 
 def _dynamic_variables(remote_voice: dict[str, Any]) -> dict[str, Any]:
+    """Extract dynamic variables from current or legacy config shapes."""
     value = remote_voice.get("dynamic_variables")
     if isinstance(value, dict):
         return value
@@ -180,6 +228,7 @@ def _dynamic_variables(remote_voice: dict[str, Any]) -> dict[str, Any]:
 
 
 def _base_url_from_daily_url(remote_voice: dict[str, Any]) -> str:
+    """Infer `/v1/public` base URL from a configured `/daily` URL."""
     daily_url = str(remote_voice.get("daily_session_url", "")).strip()
     if daily_url.endswith("/daily"):
         return daily_url[: -len("/daily")]

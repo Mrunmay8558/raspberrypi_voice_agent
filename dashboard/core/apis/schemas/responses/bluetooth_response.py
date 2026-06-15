@@ -1,8 +1,11 @@
+"""Bluetooth response schemas."""
+
 from pydantic import BaseModel
-from pydantic import Field
 
 
 class BluetoothDevice(BaseModel):
+    """Bluetooth device details returned by bluetoothctl."""
+
     mac: str
     name: str
     connected: bool = False
@@ -10,12 +13,8 @@ class BluetoothDevice(BaseModel):
     trusted: bool = False
 
 
-class BluetoothConnectRequest(BaseModel):
-    mac: str = Field(min_length=8, max_length=32)
-    pair: bool = True
-    trust: bool = True
-
-
 class BluetoothActionResponse(BaseModel):
+    """Bluetooth command result."""
+
     ok: bool
     output: str

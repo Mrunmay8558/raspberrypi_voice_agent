@@ -91,7 +91,7 @@ uvicorn dashboard.main:app --host 0.0.0.0 --port 8080
 or with the configured `DASHBOARD_HOST` and `DASHBOARD_PORT` values:
 
 ```bash
-python -m dashboard.server
+python -m dashboard.main
 ```
 
 Open it from the same network:

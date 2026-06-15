@@ -10,7 +10,7 @@ User=__RUN_USER__
 Group=__RUN_GROUP__
 WorkingDirectory=__PROJECT_ROOT__
 EnvironmentFile=__PROJECT_ROOT__/.env
-ExecStart=__PROJECT_ROOT__/.venv/bin/python -m dashboard.server
+ExecStart=__PROJECT_ROOT__/.venv/bin/python -m dashboard.main
 Restart=always
 RestartSec=5
 
