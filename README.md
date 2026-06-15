@@ -169,7 +169,7 @@ python -m voice_client.runner
 Run the local dashboard:
 
 ```bash
-python -m dashboard.main
+./start_dashboard.sh
 ```
 
 Run the no-browser setup CLI:
@@ -188,7 +188,7 @@ WiFi as the Raspberry Pi. It is not intended for public exposure by default.
 Start it manually:
 
 ```bash
-python -m dashboard.main
+./start_dashboard.sh
 ```
 
 Then open:
