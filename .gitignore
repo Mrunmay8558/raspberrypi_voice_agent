@@ -1,5 +1,5 @@
 .env
-config.json
+/config.json
 user.json
 .venv/
 __pycache__/

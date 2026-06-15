@@ -99,29 +99,83 @@
           </article>
 
           <article class="panel">
-            <h2>Remote Voice</h2>
+            <div class="panel-header">
+              <h2>Voice Runtime</h2>
+              <button id="load-agents" type="button">Load agents</button>
+            </div>
             <form id="remote-voice-form" class="form compact">
+              <label>
+                Runtime
+                <select id="runtime-mode" required>
+                  <option value="local">Local voice bot</option>
+                  <option value="remote_daily">Eigi voice bot</option>
+                </select>
+              </label>
+              <label>
+                Eigi API base
+                <input
+                  id="public-api-base-url"
+                  placeholder="http://localhost:4000/v1/public"
+                  required
+                />
+              </label>
               <input
                 id="daily-session-url"
                 placeholder="http://localhost:4000/v1/public/daily"
                 required
               />
-              <input id="eigi-agent-id" placeholder="Agent ID" required />
+              <label>
+                Agent
+                <select id="agent-select">
+                  <option value="">Load agents from Eigi</option>
+                </select>
+              </label>
+              <input id="eigi-agent-id" placeholder="Agent ID" />
+              <textarea
+                id="dynamic-variables"
+                rows="6"
+                placeholder='{"patient_name":"Maya"}'
+              ></textarea>
               <input
                 id="conversation-config-type"
                 placeholder="VOICE"
                 value="VOICE"
                 required
               />
-              <select id="voice-client-type" required>
-                <option value="native">Native C++</option>
-                <option value="browser">Browser fallback</option>
-              </select>
+              <label class="inline">
+                <input id="is-test-call" type="checkbox" />
+                Test call
+              </label>
               <input id="native-bin" placeholder="Native binary path" />
               <input id="native-config-file" placeholder="Native config file" />
-              <button type="submit">Save remote voice</button>
+              <button type="submit">Save voice runtime</button>
             </form>
             <p id="api-key-preview" class="message"></p>
+            <div id="dynamic-variable-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <h2>API Keys</h2>
+            <form id="api-key-form" class="form compact">
+              <input id="eigi-api-key" type="password" placeholder="EIGI_API_KEY" />
+              <input
+                id="openai-api-key"
+                type="password"
+                placeholder="OPENAI_API_KEY"
+              />
+              <input
+                id="deepgram-api-key"
+                type="password"
+                placeholder="DEEPGRAM_API_KEY"
+              />
+              <input
+                id="cartesia-api-key"
+                type="password"
+                placeholder="CARTESIA_API_KEY"
+              />
+              <button type="submit">Save API keys</button>
+            </form>
+            <div id="api-key-status" class="list"></div>
           </article>
         </section>
         <p id="app-message" class="message"></p>

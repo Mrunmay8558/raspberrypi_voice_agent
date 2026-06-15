@@ -107,13 +107,22 @@ async function loadBluetooth(scan = false) {
 
 async function loadRemoteVoiceSettings() {
   const settings = await request("/api/remote-voice/settings");
+  document.querySelector("#runtime-mode").value = settings.runtime_mode || "local";
+  document.querySelector("#public-api-base-url").value =
+    settings.public_api_base_url || "";
   document.querySelector("#daily-session-url").value =
     settings.daily_session_url || "";
   document.querySelector("#eigi-agent-id").value = settings.agent_id || "";
+  document.querySelector("#dynamic-variables").value = JSON.stringify(
+    settings.dynamic_variables || {},
+    null,
+    2,
+  );
   document.querySelector("#conversation-config-type").value =
     settings.conversation_config_type || "VOICE";
-  document.querySelector("#voice-client-type").value =
-    settings.client_type || "native";
+  document.querySelector("#is-test-call").checked = Boolean(
+    settings.is_test_call,
+  );
   document.querySelector("#native-bin").value = settings.native_bin || "";
   document.querySelector("#native-config-file").value =
     settings.native_config_file || "";
@@ -121,6 +130,88 @@ async function loadRemoteVoiceSettings() {
     settings.api_key_configured
       ? `API key loaded from .env: ${settings.api_key_preview}`
       : "API key is not configured. Set EIGI_API_KEY in .env.";
+}
+
+async function loadApiKeyStatus() {
+  const status = await request("/api/remote-voice/api-keys");
+  const list = document.querySelector("#api-key-status");
+  list.innerHTML = "";
+  Object.entries(status).forEach(([key, value]) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `
+      <strong>${key}</strong>
+      <span class="badge ${value.configured ? "" : "off"}">${value.configured ? value.preview : "missing"}</span>
+    `;
+    list.appendChild(row);
+  });
+}
+
+async function loadAgents() {
+  setMessage("Loading Eigi agents...");
+  const payload = await request("/api/remote-voice/agents?page_size=100");
+  const agents = payload.agents || [];
+  const select = document.querySelector("#agent-select");
+  const currentAgentId = document.querySelector("#eigi-agent-id").value;
+  select.innerHTML = '<option value="">Select an agent</option>';
+  agents.forEach((agent) => {
+    const option = document.createElement("option");
+    option.value = agent.id;
+    option.textContent = agent.agent_name
+      ? `${agent.agent_name} (${agent.id})`
+      : agent.id;
+    option.dataset.dynamicVariables = JSON.stringify(
+      agent.dynamic_variables || [],
+    );
+    select.appendChild(option);
+  });
+  if (currentAgentId) {
+    select.value = currentAgentId;
+  }
+  setMessage(`Loaded ${agents.length} agents.`);
+}
+
+async function loadDynamicVariables(agentId) {
+  const list = document.querySelector("#dynamic-variable-list");
+  list.innerHTML = "";
+  if (!agentId) {
+    return;
+  }
+  const payload = await request(
+    `/api/remote-voice/agents/${encodeURIComponent(agentId)}/dynamic-variables`,
+  );
+  const variables = payload.dynamic_variables || [];
+  if (!variables.length) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.textContent = "No dynamic variables configured for this agent.";
+    list.appendChild(row);
+    return;
+  }
+  variables.forEach((variable) => {
+    const name = variable.name || variable.key || variable.variable || "";
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `
+      <div>
+        <strong>${name}</strong>
+        <span class="muted">${variable.description || variable.type || ""}</span>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function parseJsonObject(selector, label) {
+  const raw = document.querySelector(selector).value.trim();
+  if (!raw) {
+    return {};
+  }
+  const parsed = JSON.parse(raw);
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error(`${label} must be a JSON object.`);
+  }
+  return parsed;
 }
 
 document
@@ -142,6 +233,7 @@ document
         loadWifi(),
         loadBluetooth(false),
         loadRemoteVoiceSettings(),
+        loadApiKeyStatus(),
       ]);
     } catch (error) {
       loginMessage.textContent = error.message;
@@ -158,6 +250,21 @@ document.querySelector("#scan-wifi").addEventListener("click", loadWifi);
 document
   .querySelector("#scan-bluetooth")
   .addEventListener("click", () => loadBluetooth(true));
+document.querySelector("#load-agents").addEventListener("click", loadAgents);
+
+document.querySelector("#agent-select").addEventListener("change", async () => {
+  const agentId = document.querySelector("#agent-select").value;
+  document.querySelector("#eigi-agent-id").value = agentId;
+  await loadDynamicVariables(agentId);
+});
+
+document.querySelector("#public-api-base-url").addEventListener("change", () => {
+  const baseUrl = document.querySelector("#public-api-base-url").value.trim();
+  if (baseUrl) {
+    document.querySelector("#daily-session-url").value =
+      `${baseUrl.replace(/\/$/, "")}/daily`;
+  }
+});
 
 document
   .querySelector("#wifi-form")
@@ -193,17 +300,32 @@ document
   .querySelector("#remote-voice-form")
   .addEventListener("submit", async (event) => {
     event.preventDefault();
+    let dynamicVariables;
+    try {
+      dynamicVariables = parseJsonObject(
+        "#dynamic-variables",
+        "Dynamic variables",
+      );
+    } catch (error) {
+      setMessage(error.message);
+      return;
+    }
+    const agentId = document.querySelector("#eigi-agent-id").value.trim();
     const payload = {
+      runtime_mode: document.querySelector("#runtime-mode").value,
+      public_api_base_url: document.querySelector("#public-api-base-url").value,
       daily_session_url: document.querySelector("#daily-session-url").value,
-      agent_id: document.querySelector("#eigi-agent-id").value,
+      agent_id: agentId,
       conversation_metadata: {
-        agent_id: document.querySelector("#eigi-agent-id").value,
+        agent_id: agentId,
+        dynamic_variables: dynamicVariables,
       },
+      dynamic_variables: dynamicVariables,
       conversation_visibility: false,
       conversation_config_type: document.querySelector(
         "#conversation-config-type",
       ).value,
-      client_type: document.querySelector("#voice-client-type").value,
+      is_test_call: document.querySelector("#is-test-call").checked,
       native_bin: document.querySelector("#native-bin").value,
       native_config_file: document.querySelector("#native-config-file").value,
     };
@@ -213,4 +335,29 @@ document
     });
     await loadRemoteVoiceSettings();
     setMessage("Remote voice settings saved.");
+  });
+
+document
+  .querySelector("#api-key-form")
+  .addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = {
+      EIGI_API_KEY: document.querySelector("#eigi-api-key").value,
+      OPENAI_API_KEY: document.querySelector("#openai-api-key").value,
+      DEEPGRAM_API_KEY: document.querySelector("#deepgram-api-key").value,
+      CARTESIA_API_KEY: document.querySelector("#cartesia-api-key").value,
+    };
+    const payload = {};
+    Object.entries(values).forEach(([key, value]) => {
+      if (value.trim()) {
+        payload[key] = value.trim();
+      }
+    });
+    await request("/api/remote-voice/api-keys", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    document.querySelector("#api-key-form").reset();
+    await Promise.all([loadApiKeyStatus(), loadRemoteVoiceSettings()]);
+    setMessage("API keys saved.");
   });

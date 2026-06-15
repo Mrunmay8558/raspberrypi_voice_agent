@@ -84,13 +84,14 @@ Non-secret device/user config stays in `user.json`:
 ```json
 {
   "remote_voice": {
+    "public_api_base_url": "http://localhost:4000/v1/public",
     "daily_session_url": "http://localhost:4000/v1/public/daily",
-    "agent_id": "6a23e90cdb48d202c0cd35c7",
-    "conversation_metadata": {
-      "agent_id": "6a23e90cdb48d202c0cd35c7"
-    },
+    "agent_id": "your-agent-id",
+    "conversation_metadata": {},
+    "dynamic_variables": {},
     "conversation_visibility": false,
-    "conversation_config_type": "VOICE"
+    "conversation_config_type": "VOICE",
+    "is_test_call": false
   },
   "voice_client": {
     "type": "native",
@@ -99,17 +100,3 @@ Non-secret device/user config stays in `user.json`:
   }
 }
 ```
-
-## Browser Fallback
-
-The browser implementation remains available for Raspberry Pi testing:
-
-```json
-{
-  "voice_client": {
-    "type": "browser"
-  }
-}
-```
-
-The production no-browser path should use `native`.

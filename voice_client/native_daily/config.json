@@ -1,0 +1,9 @@
+{
+  "createDailyRoom": false,
+  "body": {
+    "client_metadata": {
+      "client": "raspberrypi_voice_agent",
+      "runtime": "remote_daily_native"
+    }
+  }
+}

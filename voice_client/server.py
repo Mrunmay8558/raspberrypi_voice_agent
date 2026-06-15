@@ -3,17 +3,12 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi import HTTPException
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
-from config import PROJECT_ROOT
 from dashboard.commons.logger import configure_logger
 from voice_client.config_store import load_remote_voice_config
 from voice_client.session import RemoteSessionError
 from voice_client.session import create_daily_session
-
-STATIC_DIR = PROJECT_ROOT / "voice_client" / "web" / "dist"
 
 
 @asynccontextmanager
@@ -34,12 +29,7 @@ app = FastAPI(
 
 @app.get("/")
 def index():
-    if not (STATIC_DIR / "index.html").exists():
-        raise HTTPException(
-            status_code=500,
-            detail="Remote voice client web build is missing. Run: cd voice_client/web && npm install && npm run build",
-        )
-    return FileResponse(STATIC_DIR / "index.html")
+    return {"status": "ok", "client": "native_daily"}
 
 
 @app.post("/api/start")
@@ -60,9 +50,3 @@ def events(payload: dict[str, Any]):
     logger.info("Pipecat client event={} data={}", event, data)
     return {"ok": True}
 
-
-app.mount(
-    "/assets",
-    StaticFiles(directory=STATIC_DIR / "assets", check_dir=False),
-    name="assets",
-)

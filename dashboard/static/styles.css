@@ -81,17 +81,40 @@ label {
 
 input,
 select,
+textarea,
 button {
-  min-height: 40px;
   border-radius: 6px;
   font: inherit;
 }
 
 input,
-select {
+select,
+textarea {
   border: 1px solid #c8d0da;
   padding: 8px 10px;
   background: #ffffff;
+}
+
+input,
+select,
+button {
+  min-height: 40px;
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+label.inline {
+  display: flex;
+  align-items: center;
+  grid-template-columns: none;
+  gap: 10px;
+}
+
+label.inline input {
+  min-height: auto;
 }
 
 button {

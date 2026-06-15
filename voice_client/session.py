@@ -25,6 +25,7 @@ def create_daily_session(config: RemoteVoiceConfig) -> dict[str, Any]:
         "conversation_metadata": _conversation_metadata(config),
         "conversation_visibility": config.conversation_visibility,
         "conversation_config_type": config.conversation_config_type or "VOICE",
+        "is_test_call": config.is_test_call,
     }
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(

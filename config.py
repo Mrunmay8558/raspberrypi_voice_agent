@@ -167,22 +167,10 @@ EIGI_API_KEY = os.getenv("EIGI_API_KEY", "").strip()
 VOICE_CLIENT_TYPE = os.getenv(
     "VOICE_CLIENT_TYPE", str(_get("voice_client", "type", "native"))
 ).strip().lower()
-if VOICE_CLIENT_TYPE not in {"native", "browser"}:
-    raise ValueError("VOICE_CLIENT_TYPE must be either 'native' or 'browser'.")
+if VOICE_CLIENT_TYPE != "native":
+    raise ValueError("VOICE_CLIENT_TYPE must be 'native'.")
 VOICE_CLIENT_HOST = os.getenv("VOICE_CLIENT_HOST", str(_get("voice_client", "host", "127.0.0.1"))).strip()
 VOICE_CLIENT_PORT = _env_int("VOICE_CLIENT_PORT", int(_get("voice_client", "port", 8090)))
-VOICE_CLIENT_WEB_PORT = _env_int(
-    "VOICE_CLIENT_WEB_PORT",
-    int(_get("voice_client", "web_port", 5174)),
-)
-VOICE_CLIENT_BROWSER_BIN = os.getenv(
-    "VOICE_CLIENT_BROWSER_BIN",
-    str(_get("voice_client", "browser_bin", "")),
-).strip()
-VOICE_CLIENT_BROWSER_HEADLESS = _env_bool(
-    "VOICE_CLIENT_BROWSER_HEADLESS",
-    bool(_get("voice_client", "browser_headless", False)),
-)
 VOICE_CLIENT_NATIVE_BIN = os.getenv(
     "VOICE_CLIENT_NATIVE_BIN",
     str(_get("voice_client", "native_bin", "voice_client/native_daily/bin/pipecat-daily-client")),

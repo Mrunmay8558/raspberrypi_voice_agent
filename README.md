@@ -203,11 +203,14 @@ Edit `user.json`:
 ```json
 {
   "remote_voice": {
+    "public_api_base_url": "http://localhost:4000/v1/public",
     "daily_session_url": "http://localhost:4000/v1/public/daily",
     "agent_id": "your-agent-id",
     "conversation_metadata": {},
+    "dynamic_variables": {},
     "conversation_visibility": false,
-    "conversation_config_type": "VOICE"
+    "conversation_config_type": "VOICE",
+    "is_test_call": false
   },
   "voice_client": {
     "type": "native",
@@ -224,7 +227,7 @@ python -m voice_client.runner
 ```
 
 The runner starts a local broker, requests `dailyRoom` and `dailyToken` from the
-eigi.ai `/v1/public/daily` endpoint, and launches the selected audio client. The
+eigi.ai `/v1/public/daily` endpoint, and launches the native audio client. The
 user does not need to manually open a browser.
 
 #### Native C++ Daily client
@@ -254,38 +257,6 @@ The script installs:
 
 ```text
 voice_client/native_daily/bin/pipecat-daily-client
-```
-
-#### Browser fallback
-
-If native is not available yet, set this in `user.json`:
-
-```json
-{
-  "voice_client": {
-    "type": "browser"
-  }
-}
-```
-
-Then build the browser client once on the Pi:
-
-```bash
-cd voice_client/web
-npm install
-npm run build
-```
-
-The Pi needs Chromium installed:
-
-```bash
-sudo apt install -y chromium-browser
-```
-
-If your Chromium binary has a different name, set:
-
-```bash
-VOICE_CLIENT_BROWSER_BIN=/path/to/chromium
 ```
 
 ### Wake listener environment settings

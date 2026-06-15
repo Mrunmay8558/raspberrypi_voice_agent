@@ -44,8 +44,7 @@ Current direction:
 - local device values live in ignored `config.json`
 - per-device agent ID and `/v1/public/daily` URL live in `user.json` or are
   saved from the local dashboard
-- `VOICE_CLIENT_TYPE=native` is the production no-browser path
-- `VOICE_CLIENT_TYPE=browser` is a Raspberry Pi fallback/debug path
+- `VOICE_CLIENT_TYPE=native` is the only supported remote client path
 
 The native client uses the Pipecat C++ Daily transport with PortAudio. It is the
 preferred path for lower-resource devices that should not depend on Chromium.

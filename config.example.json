@@ -43,20 +43,20 @@
     "static_dir": "dashboard/static"
   },
   "remote_voice": {
+    "public_api_base_url": "http://localhost:4000/v1/public",
     "daily_session_url": "http://localhost:4000/v1/public/daily",
     "agent_id": "",
     "conversation_metadata": {},
+    "dynamic_variables": {},
     "conversation_visibility": false,
-    "conversation_config_type": "VOICE"
+    "conversation_config_type": "VOICE",
+    "is_test_call": false
   },
   "voice_client": {
     "type": "native",
     "host": "127.0.0.1",
     "port": 8090,
-    "web_port": 5174,
     "native_bin": "voice_client/native_daily/bin/pipecat-daily-client",
-    "native_config_file": "voice_client/native_daily/config.json",
-    "browser_bin": "",
-    "browser_headless": false
+    "native_config_file": "voice_client/native_daily/config.json"
   }
 }
