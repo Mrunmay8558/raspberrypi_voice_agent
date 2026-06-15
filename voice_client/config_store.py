@@ -57,7 +57,7 @@ def load_remote_voice_config() -> RemoteVoiceConfig:
     """Load remote voice settings from defaults, user config, and `.env`.
 
     Returns:
-        Fully resolved remote voice configuration.
+        RemoteVoiceConfig: Fully resolved remote voice configuration.
     """
     file_config = _read_config_file(USER_CONFIG_FILE)
     remote_voice = _merge_section(REMOTE_VOICE_CONFIG, file_config.get("remote_voice", {}))
@@ -107,7 +107,7 @@ def save_remote_voice_config(updates: dict[str, Any]) -> RemoteVoiceConfig:
         updates: Partial remote voice settings from the dashboard.
 
     Returns:
-        The resolved configuration after applying updates.
+        RemoteVoiceConfig: The resolved configuration after applying updates.
     """
     current = load_remote_voice_config()
     file_config = _read_config_file(USER_CONFIG_FILE)
@@ -158,7 +158,12 @@ def save_remote_voice_config(updates: dict[str, Any]) -> RemoteVoiceConfig:
 
 
 def public_remote_voice_config() -> dict[str, str | bool]:
-    """Return remote voice settings safe for dashboard display."""
+    """Return remote voice settings safe for dashboard display.
+
+    Returns:
+        dict[str, str | bool]: Masked remote voice configuration for the
+        dashboard UI.
+    """
     config = load_remote_voice_config()
     return {
         "runtime_mode": config.runtime_mode,
@@ -183,6 +188,13 @@ def _read_config_file(path: Path) -> dict[str, Any]:
 
     Invalid or unreadable user config is treated as absent so the dashboard can
     still boot and allow repair.
+
+    Args:
+        path: Path to the optional user configuration file.
+
+    Returns:
+        dict[str, Any]: Parsed JSON object, or an empty dict when the file is
+        missing or unreadable.
     """
     if not path.exists():
         return {}
@@ -193,7 +205,15 @@ def _read_config_file(path: Path) -> dict[str, Any]:
 
 
 def _merge_section(defaults: dict[str, Any], overrides: Any) -> dict[str, Any]:
-    """Merge one config section with shallow user overrides."""
+    """Merge one config section with shallow user overrides.
+
+    Args:
+        defaults: Committed or config-derived default values.
+        overrides: User-provided override object.
+
+    Returns:
+        dict[str, Any]: Merged section values.
+    """
     if not isinstance(overrides, dict):
         overrides = {}
     merged = dict(defaults)
@@ -202,7 +222,15 @@ def _merge_section(defaults: dict[str, Any], overrides: Any) -> dict[str, Any]:
 
 
 def _conversation_metadata(remote_voice: dict[str, Any]) -> dict[str, Any]:
-    """Build Eigi conversation metadata from stored remote voice settings."""
+    """Build Eigi conversation metadata from stored remote voice settings.
+
+    Args:
+        remote_voice: Remote voice section loaded from configuration.
+
+    Returns:
+        dict[str, Any]: Conversation metadata with required agent and dynamic
+        variable fields applied.
+    """
     metadata = remote_voice.get("conversation_metadata")
     if not isinstance(metadata, dict):
         metadata = {}
@@ -217,7 +245,14 @@ def _conversation_metadata(remote_voice: dict[str, Any]) -> dict[str, Any]:
 
 
 def _dynamic_variables(remote_voice: dict[str, Any]) -> dict[str, Any]:
-    """Extract dynamic variables from current or legacy config shapes."""
+    """Extract dynamic variables from current or legacy config shapes.
+
+    Args:
+        remote_voice: Remote voice section loaded from configuration.
+
+    Returns:
+        dict[str, Any]: Resolved dynamic variables map.
+    """
     value = remote_voice.get("dynamic_variables")
     if isinstance(value, dict):
         return value
@@ -228,7 +263,14 @@ def _dynamic_variables(remote_voice: dict[str, Any]) -> dict[str, Any]:
 
 
 def _base_url_from_daily_url(remote_voice: dict[str, Any]) -> str:
-    """Infer `/v1/public` base URL from a configured `/daily` URL."""
+    """Infer `/v1/public` base URL from a configured `/daily` URL.
+
+    Args:
+        remote_voice: Remote voice section loaded from configuration.
+
+    Returns:
+        str: Public API base URL derived from the stored settings.
+    """
     daily_url = str(remote_voice.get("daily_session_url", "")).strip()
     if daily_url.endswith("/daily"):
         return daily_url[: -len("/daily")]

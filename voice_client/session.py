@@ -81,7 +81,14 @@ def create_daily_session(config: RemoteVoiceConfig) -> dict[str, Any]:
 
 
 def _daily_session_payload(config: RemoteVoiceConfig) -> dict[str, Any]:
-    """Build the Eigi `/v1/public/daily` request payload."""
+    """Build the Eigi `/v1/public/daily` request payload.
+
+    Args:
+        config: Fully resolved remote voice configuration.
+
+    Returns:
+        dict[str, Any]: JSON payload sent to the Eigi public Daily endpoint.
+    """
     return {
         "agent_id": config.agent_id,
         "conversation_metadata": _conversation_metadata(config),
@@ -92,7 +99,14 @@ def _daily_session_payload(config: RemoteVoiceConfig) -> dict[str, Any]:
 
 
 def _normalize_daily_session(session: dict[str, Any]) -> dict[str, Any]:
-    """Add native-client field aliases to an Eigi Daily response."""
+    """Add native-client field aliases to an Eigi Daily response.
+
+    Args:
+        session: Raw JSON session object returned by the Eigi API.
+
+    Returns:
+        dict[str, Any]: Session object with `room_url` and `token` aliases.
+    """
     if "room_url" not in session and "dailyRoom" in session:
         session["room_url"] = session["dailyRoom"]
     if "token" not in session and "dailyToken" in session:
@@ -101,7 +115,14 @@ def _normalize_daily_session(session: dict[str, Any]) -> dict[str, Any]:
 
 
 def _conversation_metadata(config: RemoteVoiceConfig) -> dict[str, Any]:
-    """Return conversation metadata with the selected agent ID included."""
+    """Return conversation metadata with the selected agent ID included.
+
+    Args:
+        config: Fully resolved remote voice configuration.
+
+    Returns:
+        dict[str, Any]: Conversation metadata sent to the Daily endpoint.
+    """
     metadata = dict(config.conversation_metadata or {})
     metadata["agent_id"] = config.agent_id
     return metadata

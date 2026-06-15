@@ -1,3 +1,10 @@
+"""Run the local Pipecat voice bot on Raspberry Pi audio devices.
+
+This module owns the fully local voice runtime: microphone input, Deepgram
+speech recognition, OpenAI-compatible LLM calls, Cartesia speech synthesis,
+and the pipeline rules used to end or idle out a session cleanly.
+"""
+
 import argparse
 import asyncio
 import os
@@ -175,6 +182,7 @@ class UserIdleHandler:
 
 
 def required_env(name: str) -> str:
+    """Return a required environment variable or raise a config error."""
     value = os.getenv(name)
     if value:
         return value
@@ -182,10 +190,12 @@ def required_env(name: str) -> str:
 
 
 def openai_api_key() -> str:
+    """Return the OpenAI-compatible API key, allowing local placeholder auth."""
     return os.getenv("OPENAI_API_KEY") or "local"
 
 
 def openai_base_url() -> str:
+    """Return the resolved OpenAI-compatible base URL for the voice bot."""
     if OPENAI_BASE_URL:
         return OPENAI_BASE_URL
     raise ValueError(
@@ -196,6 +206,7 @@ def openai_base_url() -> str:
 
 
 def create_bot_transport() -> BaseTransport:
+    """Create the local audio transport used by the Pipecat pipeline."""
     return LocalAudioTransport(
         LocalAudioTransportParams(
             audio_in_enabled=True,
@@ -226,6 +237,14 @@ async def run_bot(
     user_idle_timeout_secs: float = 20.0,
     handle_sigint: bool = True,
 ):
+    """Build and run the local voice assistant pipeline.
+
+    Args:
+        transport: Pipecat transport used for local microphone and speaker I/O.
+        pipeline_idle_timeout_secs: Worker idle timeout before cleanup.
+        user_idle_timeout_secs: Silence threshold before idle prompts.
+        handle_sigint: Whether the Pipecat runner should manage SIGINT.
+    """
     logger.info("Starting voice bot")
 
     stt = DeepgramSTTService(
@@ -272,6 +291,8 @@ async def run_bot(
         ),
     )
 
+    # Keep the pipeline linear and explicit: input -> STT -> user context ->
+    # LLM -> sentinel filter -> TTS -> speaker -> assistant context.
     pipeline = Pipeline(
         [
             transport.input(),
@@ -327,6 +348,7 @@ async def run_bot(
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse local voice bot CLI arguments."""
     parser = argparse.ArgumentParser(
         description="Run the Raspberry Pi voice bot directly on local audio devices."
     )
@@ -346,6 +368,7 @@ def parse_args() -> argparse.Namespace:
 
 
 async def main() -> None:
+    """CLI entrypoint for the local voice bot."""
     args = parse_args()
     transport = create_bot_transport()
     await run_bot(

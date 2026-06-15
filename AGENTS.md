@@ -22,9 +22,7 @@ Primary application areas:
 - `config.py`: central configuration loader. Reads `.env`, `config.json`, and
   `config.example.json`.
 - `env_store.py`: reads and writes dashboard-managed secrets in `.env`.
-- `wake_uplister/listener.py`: real wake-word listener implementation.
-- `voice_bot/wake_listener.py`: compatibility shim that delegates to
-  `wake_uplister.listener`.
+- `wake_uplister/listener.py`: wake-word listener implementation.
 - `voice_bot/bot.py`: local Pipecat voice bot entrypoint.
 - `voice_client/runner.py`: remote-session runner that starts the local broker
   and native Daily client.

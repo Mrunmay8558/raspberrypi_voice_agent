@@ -1,3 +1,10 @@
+"""Continuously listen for a wake word and launch the selected runtime mode.
+
+This module keeps the microphone open for wake-word detection, starts either
+the local voice bot or the remote Daily client, and prevents duplicate session
+launches with a pid file and process checks.
+"""
+
 import argparse
 import os
 import signal
@@ -26,6 +33,11 @@ from config import VOICE_RUNTIME_MODE
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse wake-listener CLI arguments.
+
+    Returns:
+        argparse.Namespace: Parsed command-line options for the listener.
+    """
     parser = argparse.ArgumentParser(
         description="Listen for a wake word and start the local voice bot when detected."
     )
@@ -77,15 +89,33 @@ def parse_args() -> argparse.Namespace:
 
 
 def configure_logging(debug: bool) -> None:
+    """Configure loguru output for the wake listener process.
+
+    Args:
+        debug: Whether DEBUG-level logging should be enabled.
+    """
     logger.remove()
     logger.add(sys.stderr, level="DEBUG" if debug else "INFO")
 
 
 def ensure_runtime_path(pid_file: Path) -> None:
+    """Create the parent directory used for pid/runtime files.
+
+    Args:
+        pid_file: Pid file path whose parent directory must exist.
+    """
     pid_file.parent.mkdir(parents=True, exist_ok=True)
 
 
 def read_pid(pid_file: Path) -> int | None:
+    """Read the tracked runtime pid from disk when present.
+
+    Args:
+        pid_file: Pid file used for runtime process tracking.
+
+    Returns:
+        int | None: Parsed pid, or `None` when unavailable or invalid.
+    """
     if not pid_file.exists():
         return None
 
@@ -96,6 +126,11 @@ def read_pid(pid_file: Path) -> int | None:
 
 
 def clear_stale_pid(pid_file: Path) -> None:
+    """Remove a pid file that no longer points at a live runtime process.
+
+    Args:
+        pid_file: Pid file to delete.
+    """
     try:
         pid_file.unlink(missing_ok=True)
     except OSError:
@@ -103,6 +138,14 @@ def clear_stale_pid(pid_file: Path) -> None:
 
 
 def process_exists(pid: int) -> bool:
+    """Return whether a process id currently exists.
+
+    Args:
+        pid: Process id to probe.
+
+    Returns:
+        bool: `True` when the pid currently exists.
+    """
     try:
         os.kill(pid, 0)
     except OSError:
@@ -111,6 +154,15 @@ def process_exists(pid: int) -> bool:
 
 
 def looks_like_bot_process(pid: int) -> bool:
+    """Best-effort check that a pid belongs to the expected voice runtime.
+
+    Args:
+        pid: Process id to inspect.
+
+    Returns:
+        bool: `True` when the process appears to be the local bot or remote
+        voice client.
+    """
     proc_cmdline = Path(f"/proc/{pid}/cmdline")
     if not proc_cmdline.exists():
         return True
@@ -124,6 +176,14 @@ def looks_like_bot_process(pid: int) -> bool:
 
 
 def active_bot_pid(pid_file: Path) -> int | None:
+    """Return the active runtime pid, clearing stale pid files when needed.
+
+    Args:
+        pid_file: Pid file used for runtime process tracking.
+
+    Returns:
+        int | None: Active runtime pid, or `None` when no valid process exists.
+    """
     pid = read_pid(pid_file)
     if pid is None:
         return None
@@ -134,10 +194,25 @@ def active_bot_pid(pid_file: Path) -> int | None:
 
 
 def write_pid(pid_file: Path, pid: int) -> None:
+    """Persist the current runtime pid for duplicate-launch protection.
+
+    Args:
+        pid_file: Pid file used for runtime process tracking.
+        pid: Runtime process id to persist.
+    """
     pid_file.write_text(f"{pid}\n")
 
 
 def start_bot(pid_file: Path) -> subprocess.Popen[bytes] | None:
+    """Start the configured voice runtime unless one is already active.
+
+    Args:
+        pid_file: Pid file used for runtime process tracking.
+
+    Returns:
+        subprocess.Popen[bytes] | None: Newly started runtime process, or
+        `None` when another session is already active.
+    """
     current_pid = active_bot_pid(pid_file)
     if current_pid is not None:
         logger.info("Bot already running with pid {}", current_pid)
@@ -161,6 +236,16 @@ def start_bot(pid_file: Path) -> subprocess.Popen[bytes] | None:
 def reap_bot_process(
     process: subprocess.Popen[bytes] | None, pid_file: Path
 ) -> subprocess.Popen[bytes] | None:
+    """Clear finished runtime processes and stale pid tracking.
+
+    Args:
+        process: Current runtime subprocess, if any.
+        pid_file: Pid file used for runtime process tracking.
+
+    Returns:
+        subprocess.Popen[bytes] | None: The still-running process, or `None`
+        when the process has exited or was absent.
+    """
     if process is None:
         active_bot_pid(pid_file)
         return None
@@ -175,6 +260,17 @@ def reap_bot_process(
 def load_wakeword_model(
     model_name: str, vad_threshold: float, inference_framework: str
 ) -> tuple[Model, str]:
+    """Download shared assets and create the openWakeWord detector.
+
+    Args:
+        model_name: Pretrained wake-word model name or custom model path.
+        vad_threshold: Silero VAD threshold used by openWakeWord.
+        inference_framework: `onnx` or `tflite`.
+
+    Returns:
+        tuple[Model, str]: Loaded wake-word model instance and resolved model
+        name key used in prediction output.
+    """
     openwakeword.utils.download_models()
     model = Model(
         wakeword_models=[model_name],
@@ -186,6 +282,15 @@ def load_wakeword_model(
 
 
 def resolve_input_device(device: str | None) -> tuple[int | str | None, int, float]:
+    """Resolve the input device and native chunk size for microphone capture.
+
+    Args:
+        device: Optional device name or index supplied by the user.
+
+    Returns:
+        tuple[int | str | None, int, float]: Selected device identifier, native
+        chunk size, and input sample rate.
+    """
     selected_device = device
     if selected_device is None:
         default_input_device, _ = sd.default.device
@@ -207,6 +312,16 @@ def resolve_input_device(device: str | None) -> tuple[int | str | None, int, flo
 
 
 def prepare_audio_frame(raw_audio: np.ndarray, input_sample_rate: float) -> np.ndarray:
+    """Resample input audio to the wake model's expected sample rate.
+
+    Args:
+        raw_audio: Captured mono PCM frame from the input device.
+        input_sample_rate: Native sample rate reported by the input device.
+
+    Returns:
+        np.ndarray: Audio frame in the wake model's expected sample rate and
+        integer PCM format.
+    """
     if int(round(input_sample_rate)) == SAMPLE_RATE:
         return raw_audio
 
@@ -217,6 +332,11 @@ def prepare_audio_frame(raw_audio: np.ndarray, input_sample_rate: float) -> np.n
 
 
 def run_listener(args: argparse.Namespace) -> None:
+    """Run the wake-word loop until interrupted by signal.
+
+    Args:
+        args: Parsed wake-listener command-line arguments.
+    """
     pid_file = Path(args.pid_file)
     ensure_runtime_path(pid_file)
 
@@ -241,6 +361,7 @@ def run_listener(args: argparse.Namespace) -> None:
     audio_buffer = np.array([], dtype=np.int16)
 
     def request_stop(signum, _frame):
+        """Request graceful shutdown after SIGINT or SIGTERM."""
         nonlocal stop_requested
         stop_requested = True
         logger.info("Received signal {}. Stopping wake listener.", signum)
@@ -269,6 +390,8 @@ def run_listener(args: argparse.Namespace) -> None:
                 audio_buffer = np.concatenate((audio_buffer, prepared_audio))
 
                 wake_detected = False
+                # Process fixed-size wake-word frames from the rolling audio
+                # buffer while keeping device reads at the native sample rate.
                 while audio_buffer.size >= CHUNK_SIZE:
                     frame = audio_buffer[:CHUNK_SIZE]
                     audio_buffer = audio_buffer[CHUNK_SIZE:]
@@ -308,6 +431,7 @@ def run_listener(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    """CLI entrypoint for the wake listener."""
     args = parse_args()
     configure_logging(args.debug)
     run_listener(args)

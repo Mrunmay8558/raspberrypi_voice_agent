@@ -21,7 +21,14 @@ from voice_client.config_store import load_remote_voice_config
 
 
 def resolve_project_path(path_value: str) -> Path:
-    """Resolve an absolute or project-relative path."""
+    """Resolve an absolute or project-relative path.
+
+    Args:
+        path_value: Path string that may be absolute or project-relative.
+
+    Returns:
+        Path: Resolved filesystem path.
+    """
     path = Path(path_value).expanduser()
     if path.is_absolute():
         return path
@@ -58,7 +65,11 @@ def start_native_client(url: str, native_bin: str, config_file: str) -> subproce
 
 
 def run_server() -> subprocess.Popen[bytes]:
-    """Start the local FastAPI broker used by the native client."""
+    """Start the local FastAPI broker used by the native client.
+
+    Returns:
+        subprocess.Popen[bytes]: Running broker process.
+    """
     command = [
         sys.executable,
         "-m",
@@ -87,6 +98,7 @@ def main() -> None:
     stopped = False
 
     def request_stop(signum, _frame):
+        """Request shutdown when the process receives SIGINT or SIGTERM."""
         nonlocal stopped
         stopped = True
         logger.info("Received signal {}. Stopping remote voice client.", signum)
@@ -118,7 +130,12 @@ def main() -> None:
 
 
 def _stop_process(process: subprocess.Popen[bytes] | None, label: str) -> None:
-    """Terminate a subprocess and kill it if graceful shutdown times out."""
+    """Terminate a subprocess and kill it if graceful shutdown times out.
+
+    Args:
+        process: Running child process to stop.
+        label: Human-readable process label for logging.
+    """
     if process is None or process.poll() is not None:
         return
 
