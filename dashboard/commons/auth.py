@@ -23,6 +23,8 @@ from dashboard.commons.logger import logger
 
 PBKDF2_ITERATIONS = 310_000
 SESSION_COOKIE_NAME = "voice_dashboard_session"
+GENERATED_USERNAME_PREFIX = "EIGI"
+GENERATED_USERNAME_RANDOM_LENGTH = 6
 
 logging = logger(__name__)
 
@@ -67,14 +69,15 @@ class AuthStore:
         if self.path.exists():
             return None
 
+        username = DASHBOARD_DEFAULT_USERNAME or self._generate_username()
         password = self._generate_password()
-        self._write_credentials(DASHBOARD_DEFAULT_USERNAME, password)
+        self._write_credentials(username, password)
         logging.warning(
             "Created first-run dashboard login username='%s' password='%s'",
-            DASHBOARD_DEFAULT_USERNAME,
+            username,
             password,
         )
-        return GeneratedCredentials(DASHBOARD_DEFAULT_USERNAME, password)
+        return GeneratedCredentials(username, password)
 
     def verify_password(self, username: str, password: str) -> bool:
         """Validate a username/password pair against stored credentials.
@@ -198,3 +201,12 @@ class AuthStore:
     def _generate_password() -> str:
         """Generate a random first-run dashboard password."""
         return secrets.token_urlsafe(18)
+
+    @staticmethod
+    def _generate_username() -> str:
+        """Generate a random first-run dashboard username."""
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        suffix = "".join(
+            secrets.choice(alphabet) for _ in range(GENERATED_USERNAME_RANDOM_LENGTH)
+        )
+        return f"{GENERATED_USERNAME_PREFIX}{suffix}"

@@ -4,7 +4,7 @@ This controller coordinates dashboard-facing host status requests and keeps
 the route layer free of service implementation details.
 """
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from dashboard.core.services.system_service import get_status
 
 logging = logger(__name__)

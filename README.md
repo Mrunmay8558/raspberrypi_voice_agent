@@ -169,7 +169,7 @@ python -m voice_client.runner
 Run the local dashboard:
 
 ```bash
-python -m dashboard.main
+./start_dashboard.sh
 ```
 
 Run the no-browser setup CLI:
@@ -188,7 +188,7 @@ WiFi as the Raspberry Pi. It is not intended for public exposure by default.
 Start it manually:
 
 ```bash
-python -m dashboard.main
+./start_dashboard.sh
 ```
 
 Then open:
@@ -203,7 +203,8 @@ or:
 http://<pi-ip-address>:8080
 ```
 
-On first run, the dashboard generates a password and logs it. Check:
+On first run, the dashboard generates a username like `EIGIxxxxxx` and a
+password, then logs both. Check:
 
 ```bash
 journalctl -u dashboard.service -n 80 --no-pager

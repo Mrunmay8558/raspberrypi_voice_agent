@@ -11,7 +11,7 @@ from config import DASHBOARD_DEBUG
 from config import DASHBOARD_STATIC_DIR
 from dashboard.commons.auth import AuthStore
 from dashboard.commons.logger import configure_logger
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from dashboard.core.apis.routes.auth_router import auth_router
 from dashboard.core.apis.routes.bluetooth_router import bluetooth_router
 from dashboard.core.apis.routes.remote_voice_router import remote_voice_router
@@ -19,6 +19,7 @@ from dashboard.core.apis.routes.system_router import system_router
 from dashboard.core.apis.routes.wifi_router import wifi_router
 
 logging = logger(__name__)
+API_V1_PREFIX = "/api/v1"
 
 
 @asynccontextmanager
@@ -75,11 +76,11 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-app.include_router(auth_router)
-app.include_router(system_router)
-app.include_router(wifi_router)
-app.include_router(bluetooth_router)
-app.include_router(remote_voice_router)
+app.include_router(auth_router, prefix=API_V1_PREFIX)
+app.include_router(system_router, prefix=API_V1_PREFIX)
+app.include_router(wifi_router, prefix=API_V1_PREFIX)
+app.include_router(bluetooth_router, prefix=API_V1_PREFIX)
+app.include_router(remote_voice_router, prefix=API_V1_PREFIX)
 app.mount("/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="static")
 
 

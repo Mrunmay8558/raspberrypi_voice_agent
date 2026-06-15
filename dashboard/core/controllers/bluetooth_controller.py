@@ -6,7 +6,7 @@ and converts command failures into HTTP-safe errors for the API layer.
 
 from fastapi import HTTPException
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from dashboard.core.apis.schemas.responses.bluetooth_response import BluetoothActionResponse
 from dashboard.core.apis.schemas.responses.bluetooth_response import BluetoothDevice
 from dashboard.core.services import bluetooth_service

@@ -5,7 +5,7 @@ from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import status
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from dashboard.core.apis.schemas.responses.system_response import SystemStatus
 from dashboard.core.controllers.system_controller import SystemController
 from dashboard.core.apis.dependencies import require_session
@@ -13,7 +13,7 @@ from dashboard.core.apis.dependencies import require_session
 logging = logger(__name__)
 
 system_router = APIRouter(
-    prefix="/api/system",
+    prefix="/system",
     tags=["system"],
     dependencies=[Depends(require_session)],
 )
@@ -28,13 +28,13 @@ def status():
         SystemStatus: Hostname, local dashboard URL, and service states.
     """
     try:
-        logging.info("Calling GET /api/system/status endpoint")
+        logging.info("Calling GET /api/v1/system/status endpoint")
         return SystemController().get_status()
     except HTTPException as httperror:
-        logging.error("Error in GET /api/system/status endpoint: %s", httperror)
+        logging.error("Error in GET /api/v1/system/status endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in GET /api/system/status endpoint: %s", error)
+        logging.error("Error in GET /api/v1/system/status endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),

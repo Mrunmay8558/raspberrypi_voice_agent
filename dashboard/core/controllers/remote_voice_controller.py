@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from env_store import public_secret_status
 from env_store import read_secret
 from env_store import write_env_values
@@ -44,6 +44,26 @@ class RemoteVoiceController:
             dict[str, Any]: Current settings after persistence.
         """
         logging.info("RemoteVoiceController.update_settings")
+        if updates.get("runtime_mode") == "local":
+            for key in (
+                "public_api_base_url",
+                "daily_session_url",
+                "agent_id",
+                "conversation_metadata",
+                "dynamic_variables",
+                "conversation_config_type",
+                "is_test_call",
+            ):
+                updates.pop(key, None)
+        else:
+            agent_id = str(updates.get("agent_id", "")).strip()
+            metadata = updates.get("conversation_metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            if agent_id:
+                metadata["agent_id"] = agent_id
+            updates["conversation_metadata"] = metadata
+
         if updates.get("public_api_base_url") and not updates.get("daily_session_url"):
             updates["daily_session_url"] = self._daily_url(updates["public_api_base_url"])
         save_remote_voice_config(updates)

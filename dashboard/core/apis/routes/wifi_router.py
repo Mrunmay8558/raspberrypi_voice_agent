@@ -5,7 +5,7 @@ from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import status
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from dashboard.core.apis.schemas.requests.wifi_request import WifiConnectRequest
 from dashboard.core.apis.schemas.responses.wifi_response import WifiConnectResponse
 from dashboard.core.apis.schemas.responses.wifi_response import WifiNetwork
@@ -15,7 +15,7 @@ from dashboard.core.apis.dependencies import require_session
 logging = logger(__name__)
 
 wifi_router = APIRouter(
-    prefix="/api/wifi",
+    prefix="/wifi",
     tags=["wifi"],
     dependencies=[Depends(require_session)],
 )
@@ -30,13 +30,13 @@ def networks():
         list[WifiNetwork]: Visible networks ordered by signal strength.
     """
     try:
-        logging.info("Calling GET /api/wifi/networks endpoint")
+        logging.info("Calling GET /api/v1/wifi/networks endpoint")
         return WifiController().scan_networks()
     except HTTPException as httperror:
-        logging.error("Error in GET /api/wifi/networks endpoint: %s", httperror)
+        logging.error("Error in GET /api/v1/wifi/networks endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in GET /api/wifi/networks endpoint: %s", error)
+        logging.error("Error in GET /api/v1/wifi/networks endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
@@ -55,13 +55,13 @@ def connect(payload: WifiConnectRequest):
         WifiConnectResponse: Command result.
     """
     try:
-        logging.info("Calling POST /api/wifi/connect endpoint")
+        logging.info("Calling POST /api/v1/wifi/connect endpoint")
         return WifiController().connect_network(payload.ssid, payload.password)
     except HTTPException as httperror:
-        logging.error("Error in POST /api/wifi/connect endpoint: %s", httperror)
+        logging.error("Error in POST /api/v1/wifi/connect endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in POST /api/wifi/connect endpoint: %s", error)
+        logging.error("Error in POST /api/v1/wifi/connect endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
