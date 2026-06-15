@@ -1,100 +1,189 @@
-# Raspberry Pi Local Voice Bot
+# Raspberry Pi Voice Agent
 
-Minimal Pipecat local-audio voice bot for Raspberry Pi 5.
+This repository runs a Raspberry Pi voice assistant stack with local wake-word
+detection, a local setup dashboard, and two conversation runtime modes.
 
-This bot uses:
+## What This Project Does
 
-- Deepgram STT with `nova-2` in multilingual mode
-- Cartesia TTS with the voice `71a7ad14-091c-4e8e-a314-022ece01c121`
-- A local OpenAI-compatible endpoint at `http://127.0.0.1:8642/v1`
+The device continuously listens for a wake word on the Raspberry Pi microphone.
+When the wake word is detected, it starts one of two voice runtimes:
 
-## Project structure
+- `local`: run the full Pipecat voice bot directly on the Raspberry Pi
+- `remote_daily`: keep wake-word detection local, then connect audio to a
+  deployed Eigi voice bot through the native Pipecat Daily client
+
+The repository also includes a local FastAPI dashboard for:
+
+- service status
+- WiFi scanning and connection
+- Bluetooth scanning and connection
+- dashboard password management
+- remote voice client configuration
+
+## Main Components
 
 ```text
 raspberrypi_voice_agent/
-├── cloudflared/
-├── config.example.json
 ├── config.py
-├── .env.example
-├── .gitignore
+├── env_store.py
 ├── dashboard/
-├── README.md
-├── requirements.txt
 ├── scripts/
 ├── systemd/
+├── voice_bot/
+├── voice_client/
 ├── wake_uplister/
-└── voice_bot/
-    ├── __init__.py
-    └── bot.py
+├── config.example.json
+├── user.example.json
+├── requirements.txt
+└── README.md
 ```
 
-## Setup
+Key runtime areas:
+
+- `wake_uplister/`: wake-word listener using `openwakeword`
+- `voice_bot/`: local Pipecat voice bot
+- `voice_client/`: remote Daily session runner and local broker for the native
+  C++ client
+- `dashboard/`: local configuration dashboard
+- `systemd/`: unit templates for boot-time startup
+- `scripts/`: helper scripts used by systemd and installation
+
+## Runtime Modes
+
+### Local mode
+
+In local mode, the wake listener starts:
 
 ```bash
-cd raspberrypi_voice_agent
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-cp config.example.json config.json
-```
-
-Fill in the API keys in `.env` and local device values in `config.json`.
-
-`OPENAI_API_KEY` can stay blank if your local gateway does not enforce auth. The bot falls back to a local placeholder key for the OpenAI-compatible client.
-
-## Run
-
-```bash
-cd raspberrypi_voice_agent
-source .venv/bin/activate
 python -m voice_bot.bot
 ```
 
-By default, the bot uses the local OpenAI-compatible Hermes gateway on
-`http://127.0.0.1:8642/v1`.
+This path uses:
 
-Set this in `.env` when testing through the Cloudflare tunnel instead:
+- Deepgram STT
+- Cartesia TTS
+- an OpenAI-compatible Hermes endpoint
+- local microphone and speaker audio on the Raspberry Pi
 
-```bash
-LOCAL_VOICE_TESTING=false
-```
+### Remote Daily mode
 
-The Cloudflare URL itself lives in local `config.json`:
-
-```json
-{
-  "voice_bot": {
-    "cloudflare_openai_base_url": "https://your-tunnel.trycloudflare.com/v1"
-  }
-}
-```
-
-Set `LOCAL_VOICE_TESTING=true` to switch back to localhost.
-
-If your gateway expects a different model name, set `OPENAI_MODEL` before starting the bot.
-
-## Local setup dashboard
-
-The repository includes a local FastAPI dashboard for Raspberry Pi setup and
-maintenance. It is intended for users connected to the same WiFi/LAN as the Pi,
-not for public internet exposure.
-
-Start it manually:
+In remote mode, the wake listener starts:
 
 ```bash
-cd raspberrypi_voice_agent
+python -m voice_client.runner
+```
+
+This path:
+
+- detects the wake word locally on the device
+- creates a Daily session through the Eigi public API
+- starts a local FastAPI broker
+- launches the native Pipecat Daily C++ audio client
+
+This mode is intended for lower-resource hardware that should not run the full
+voice bot locally.
+
+## Configuration Model
+
+Configuration is layered in this order:
+
+1. `.env`
+2. local ignored `config.json`
+3. committed `config.example.json`
+
+Additional local files:
+
+- `user.json`: ignored per-device remote voice settings
+- `user.example.json`: committed template for `user.json`
+- `run/dashboard_auth.json`: generated dashboard credential store
+- `run/bot.pid`: wake-listener pid tracking file
+
+Do not commit:
+
+- `.env`
+- `config.json`
+- `user.json`
+- API keys
+- Daily room URLs or tokens
+- Cloudflare quick-tunnel URLs
+- generated dashboard passwords
+
+## Setup
+
+### 1. Create the Python environment
+
+```bash
+python3 -m venv .venv
 source .venv/bin/activate
-uvicorn dashboard.main:app --host 0.0.0.0 --port 8080
+pip install -r requirements.txt
 ```
 
-or with the configured `DASHBOARD_HOST` and `DASHBOARD_PORT` values:
+### 2. Create local config files
+
+```bash
+cp .env.example .env
+cp config.example.json config.json
+cp user.example.json user.json
+```
+
+### 3. Fill in local values
+
+Typical values to configure:
+
+- `DEEPGRAM_API_KEY`
+- `CARTESIA_API_KEY`
+- `EIGI_API_KEY` when using remote mode
+- Hermes/OpenAI-compatible endpoint values if they differ from defaults
+- agent id and remote session values in `user.json` for remote mode
+
+`OPENAI_API_KEY` may remain blank when the local Hermes gateway does not enforce
+auth. The local bot falls back to a placeholder value for OpenAI-compatible
+requests.
+
+## Common Commands
+
+Activate the environment first:
+
+```bash
+source .venv/bin/activate
+```
+
+Run the local bot directly:
+
+```bash
+python -m voice_bot.bot
+```
+
+Run the wake listener:
+
+```bash
+python -m wake_uplister.listener
+```
+
+Run the remote Daily client directly:
+
+```bash
+python -m voice_client.runner
+```
+
+Run the local dashboard:
 
 ```bash
 python -m dashboard.main
 ```
 
-Open it from the same network:
+## Dashboard
+
+The dashboard is a local setup surface intended for devices on the same LAN or
+WiFi as the Raspberry Pi. It is not intended for public exposure by default.
+
+Start it manually:
+
+```bash
+python -m dashboard.main
+```
+
+Then open:
 
 ```text
 http://raspberrypi.local:8080
@@ -106,7 +195,7 @@ or:
 http://<pi-ip-address>:8080
 ```
 
-On first run, the dashboard creates a generated admin password and logs it. Check:
+On first run, the dashboard generates a password and logs it. Check:
 
 ```bash
 journalctl -u dashboard.service -n 80 --no-pager
@@ -115,253 +204,105 @@ journalctl -u dashboard.service -n 80 --no-pager
 The dashboard currently supports:
 
 - service status
-- WiFi scanning and connection through `nmcli`
-- Bluetooth scanning, pairing, trusting, connecting, and disconnecting through `bluetoothctl`
-- remote Daily voice client settings for low-resource devices
+- WiFi management through `nmcli`
+- Bluetooth management through `bluetoothctl`
+- remote voice settings
 - dashboard password change
 
-The password hash is stored in `run/dashboard_auth.json` by default. The plain
-password is not stored.
+## Wake Word
 
-Template settings live in `config.example.json`. Local settings live in ignored
-`config.json`. Secrets stay in `.env`; per-device non-secret settings are saved
-to `user.json`.
+Wake-word detection runs through `openwakeword` in `wake_uplister/listener.py`.
 
-The bot has two separate idle controls:
+Current defaults:
 
-- `--user-idle-timeout-secs`: silence during a conversation before the bot asks whether you are still there
-- `--pipeline-idle-timeout-secs`: worker-level cleanup timeout when the pipeline itself is idle
+- wake word: `hey jarvis`
+- sample rate: `16000`
+- frame size: `1280`
+- inference framework: `onnx`
 
-After repeated user-idle prompts, the bot speaks a short closing message and ends cleanly. The wake listener can then start a fresh bot session on the next wake word.
+Useful environment overrides:
 
-## Wake word listener for Raspberry Pi 5
+- `WAKEWORD_MODEL`
+- `WAKEWORD_THRESHOLD`
+- `WAKEWORD_COOLDOWN_SECS`
+- `WAKEWORD_VAD_THRESHOLD`
+- `WAKEWORD_INFERENCE_FRAMEWORK`
 
-The repository includes a separate wake listener that continuously listens on the Raspberry Pi microphone and starts the local voice bot when a wake word is detected.
+If the voice runtime is already active, the wake listener will not launch a
+second copy.
 
-### Install additional audio dependencies on Raspberry Pi
+## Local Hermes Gateway
 
-```bash
-sudo apt update
-sudo apt install -y libportaudio2 portaudio19-dev pipewire-alsa
-```
-
-Then install the Python packages:
-
-```bash
-cd raspberrypi_voice_agent
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-The wake listener defaults to the ONNX inference backend because Raspberry Pi Python 3.13 does not have a reliable upstream TFLite runtime wheel for this setup. `openwakeword` includes ONNX support on Linux through its Python dependencies.
-
-### Start the wake listener manually
-
-```bash
-cd raspberrypi_voice_agent
-source .venv/bin/activate
-python -m wake_uplister.listener
-```
-
-The listener opens the selected input device at its native sample rate and resamples to 16 kHz for wake-word detection. It feeds openWakeWord 80 ms frames, which is `1280` samples at 16 kHz.
-
-By default, the listener watches for the `hey jarvis` wake word and launches:
-
-```bash
-python -m voice_bot.bot
-```
-
-The bot uses the Raspberry Pi's default PipeWire audio devices, so paired
-AirPods or any configured default microphone/speaker can be used directly
-without opening a browser UI.
-
-Those defaults now live in local `config.json`, with a committed template in
-`config.example.json`.
-
-If the bot is already running, the listener will not start a second copy.
-
-### Remote Daily/Pipecat client mode
-
-For lower-resource hardware, set the wake listener to launch a remote Daily
-client instead of running the full Pipecat bot locally:
-
-```bash
-VOICE_RUNTIME_MODE=remote_daily
-EIGI_API_KEY=<public-api-key>
-VOICE_CLIENT_TYPE=native
-```
-
-Default remote values can live in local `config.json`. For a specific device,
-create `user.json` from the example:
-
-```bash
-cp user.example.json user.json
-```
-
-Edit `user.json`:
-
-```json
-{
-  "remote_voice": {
-    "public_api_base_url": "http://localhost:4000/v1/public",
-    "daily_session_url": "http://localhost:4000/v1/public/daily",
-    "agent_id": "your-agent-id",
-    "conversation_metadata": {},
-    "dynamic_variables": {},
-    "conversation_visibility": false,
-    "conversation_config_type": "VOICE",
-    "is_test_call": false
-  },
-  "voice_client": {
-    "type": "native",
-    "native_bin": "voice_client/native_daily/bin/pipecat-daily-client",
-    "native_config_file": "voice_client/native_daily/config.json"
-  }
-}
-```
-
-In this mode the wake listener still detects `hey jarvis` locally, then starts:
-
-```bash
-python -m voice_client.runner
-```
-
-The runner starts a local broker, requests `dailyRoom` and `dailyToken` from the
-eigi.ai `/v1/public/daily` endpoint, and launches the native audio client. The
-user does not need to manually open a browser.
-
-#### Native C++ Daily client
-
-The production no-browser path uses the Pipecat C++ Daily client with PortAudio.
-Build it on the Pi:
-
-```bash
-sudo apt update
-sudo apt install -y build-essential cmake ninja-build git libcurl4-openssl-dev libportaudio2 portaudio19-dev
-```
-
-Download and extract the Daily Core C++ SDK for Linux `aarch64` from:
+The local voice bot expects an OpenAI-compatible endpoint. By default it uses
+the Hermes gateway on:
 
 ```text
-https://github.com/daily-co/daily-core-sdk/releases
+http://127.0.0.1:8642/v1
 ```
 
-Then run:
+When testing through a Cloudflare URL instead of localhost:
 
 ```bash
-export DAILY_CORE_PATH=/path/to/daily-core-sdk
+LOCAL_VOICE_TESTING=false
+```
+
+The Cloudflare OpenAI-compatible base URL is configured in local `config.json`.
+
+## Native Daily Client
+
+The remote mode uses the Pipecat C++ Daily client with PortAudio.
+
+Build it with:
+
+```bash
 ./voice_client/native_daily/scripts/build_native_daily_client.sh
 ```
 
-The script installs:
+You must provide the Daily Core SDK path first, typically through
+`DAILY_CORE_PATH`, as described in:
 
-```text
-voice_client/native_daily/bin/pipecat-daily-client
-```
+- [voice_client/native_daily/README.md](voice_client/native_daily/README.md)
 
-### Wake listener environment settings
+## Boot Services
 
-The default values come from local `config.json`, falling back to
-`config.example.json` when no local config exists. If you want to override them
-without editing JSON, set these values in `.env`:
+The repository includes systemd templates for:
 
-- `WAKEWORD_MODEL`: pretrained model name such as `hey jarvis`, `alexa`, or a custom model path
-- `WAKEWORD_THRESHOLD`: minimum score required to trigger the bot
-- `WAKEWORD_COOLDOWN_SECS`: cooldown after a trigger before another trigger is allowed
-- `WAKEWORD_VAD_THRESHOLD`: speech activity threshold to reduce false positives
-- `WAKEWORD_INFERENCE_FRAMEWORK`: `onnx` by default for this Raspberry Pi setup, or `tflite` if a compatible runtime is installed
+- Hermes gateway
+- Cloudflare tunnel
+- dashboard
+- wake listener
+- top-level stack target
 
-### Start the wake listener on boot with systemd
-
-Use the installer script so the systemd units are rendered with your actual project path and Raspberry Pi user:
+Install and enable the full stack:
 
 ```bash
 sudo ./scripts/install_boot_services.sh --enable-now
 ```
 
-If you only want the wake listener service enabled, you can still enable it by itself after installation:
+For unit details, see:
+
+- [systemd/README.md](systemd/README.md)
+
+## Folder Guides
+
+More focused runtime docs live in:
+
+- [voice_bot/README.md](voice_bot/README.md)
+- [voice_client/README.md](voice_client/README.md)
+- [wake_uplister/README.md](wake_uplister/README.md)
+
+Planned platform extensions and future work are tracked in:
+
+- [future-options.md](future-options.md)
+
+## Validation
+
+Useful checks before pushing changes:
 
 ```bash
-sudo systemctl enable --now voice-bot-wake.service
-```
-
-## Boot stack for reboot recovery
-
-The repository now includes a boot stack that can start all required local services after a Raspberry Pi reboot:
-
-- Hermes gateway service on the local port used by the bot
-- Cloudflare tunnel service that waits until the Hermes port is reachable
-- Wake listener service that keeps listening for the wake word
-
-### Configure the Hermes gateway command
-
-The startup script reads its default Hermes settings from local `config.json`,
-falling back to `config.example.json`. By default it uses `hermes gateway run
---replace` and expects the gateway on `http://127.0.0.1:8642/v1`.
-
-If you want to override that without editing code, you can still set:
-
-```bash
-HERMES_GATEWAY_COMMAND="hermes gateway run --replace"
-```
-
-If that command serves on a port other than `8642`, either change `HERMES_GATEWAY_PORT` to match it and update the bot, or keep the gateway configured to serve on `8642` so the bot can still reach `http://127.0.0.1:8642/v1`.
-
-### Configure the Cloudflare tunnel
-
-This setup now uses the direct quick-tunnel form by default:
-
-```bash
-cloudflared tunnel --url http://localhost:8642
-```
-
-The boot script runs that same pattern automatically. By default it targets `http://localhost:8642`.
-
-The startup script reads its default Cloudflare settings from local
-`config.json`, falling back to `config.example.json`. By default it uses:
-
-```bash
-cloudflared tunnel --url http://localhost:8642
-```
-
-If you want a different quick-tunnel target, you can still override it in `.env`:
-
-```bash
-CLOUDFLARED_TARGET_URL=http://localhost:8642
-```
-
-If you do not set `CLOUDFLARED_TARGET_URL`, the script uses `http://localhost:8642` directly.
-
-### Install and enable the full reboot stack
-
-```bash
-cd raspberrypi_voice_agent
-sudo ./scripts/install_boot_services.sh --enable-now
-```
-
-That installs these units:
-
-- `dashboard.service`
-- `hermes-gateway.service`
-- `cloudflared-hermes-tunnel.service`
-- `voice-bot-wake.service`
-- `voice-assistant-stack.target`
-
-### Control the stack
-
-```bash
-sudo systemctl restart voice-assistant-stack.target
-sudo systemctl status dashboard.service
-sudo systemctl status hermes-gateway.service
-sudo systemctl status cloudflared-hermes-tunnel.service
-sudo systemctl status voice-bot-wake.service
-```
-
-### Check logs
-
-```bash
-journalctl -u dashboard.service -f
-journalctl -u hermes-gateway.service -f
-journalctl -u cloudflared-hermes-tunnel.service -f
-journalctl -u voice-bot-wake.service -f
+PYTHONPYCACHEPREFIX=/tmp/raspberrypi_voice_agent_pycache .venv/bin/python -m compileall \
+  config.py env_store.py dashboard voice_bot voice_client wake_uplister
+node --check dashboard/static/app.js
+.venv/bin/python -m json.tool config.example.json >/dev/null
+.venv/bin/python -m json.tool user.example.json >/dev/null
 ```
