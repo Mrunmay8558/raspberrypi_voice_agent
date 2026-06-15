@@ -1,4 +1,6 @@
 .env
+config.json
+user.json
 .venv/
 __pycache__/
 *.pyc
@@ -7,3 +9,6 @@ run/
 *.pid
 cloudflared/*.yml
 cloudflared/*.yaml
+.native_deps/
+voice_client/native_daily/bin/
+voice_client/native_daily/build/

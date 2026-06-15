@@ -11,6 +11,7 @@ from dashboard.commons.logger import configure_logger
 from dashboard.core.security import AuthStore
 from dashboard.routers import auth
 from dashboard.routers import bluetooth
+from dashboard.routers import remote_voice
 from dashboard.routers import system
 from dashboard.routers import wifi
 
@@ -43,6 +44,7 @@ app.include_router(auth.router)
 app.include_router(system.router)
 app.include_router(wifi.router)
 app.include_router(bluetooth.router)
+app.include_router(remote_voice.router)
 app.mount("/static", StaticFiles(directory=DASHBOARD_STATIC_DIR), name="static")
 
 

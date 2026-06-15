@@ -189,9 +189,9 @@ def openai_base_url() -> str:
     if OPENAI_BASE_URL:
         return OPENAI_BASE_URL
     raise ValueError(
-        "Missing OpenAI base URL. In config.py, set LOCAL_VOICE_TESTING = True "
-        "for local Hermes or set CLOUDFLARE_OPENAI_BASE_URL when "
-        "LOCAL_VOICE_TESTING = False."
+        "Missing OpenAI base URL. In config.json, set "
+        "voice_bot.local_voice_testing=true for local Hermes or configure "
+        "voice_bot.cloudflare_openai_base_url when local_voice_testing=false."
     )
 
 

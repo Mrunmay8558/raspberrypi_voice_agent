@@ -1,49 +1,193 @@
+import json
 import os
+from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+LOCAL_CONFIG_FILE = PROJECT_ROOT / "config.json"
+EXAMPLE_CONFIG_FILE = PROJECT_ROOT / "config.example.json"
+DEFAULT_CONFIG_FILE = LOCAL_CONFIG_FILE if LOCAL_CONFIG_FILE.exists() else EXAMPLE_CONFIG_FILE
+CONFIG_FILE = Path(os.getenv("APP_CONFIG_FILE", str(DEFAULT_CONFIG_FILE)))
 
 
-DEFAULT_HERMES_GATEWAY_COMMAND = "hermes gateway run --replace"
-DEFAULT_HERMES_HOST = "127.0.0.1"
-DEFAULT_HERMES_PORT = 8642
-LOCAL_OPENAI_BASE_URL = f"http://{DEFAULT_HERMES_HOST}:{DEFAULT_HERMES_PORT}/v1"
-CLOUDFLARE_OPENAI_BASE_URL = "https://tea-referral-multiple-mtv.trycloudflare.com/v1"
-LOCAL_VOICE_TESTING_VALUE = os.getenv("LOCAL_VOICE_TESTING", "true").strip().lower()
-if LOCAL_VOICE_TESTING_VALUE not in {"true", "false"}:
-    raise ValueError("LOCAL_VOICE_TESTING must be either 'true' or 'false'.")
-LOCAL_VOICE_TESTING = LOCAL_VOICE_TESTING_VALUE == "true"
-OPENAI_BASE_URL = (
-    LOCAL_OPENAI_BASE_URL if LOCAL_VOICE_TESTING else CLOUDFLARE_OPENAI_BASE_URL
+def _read_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON config file: {path}") from exc
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = deepcopy(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _section(name: str) -> dict[str, Any]:
+    section = APP_CONFIG.get(name, {})
+    if not isinstance(section, dict):
+        raise ValueError(f"config.json section '{name}' must be an object.")
+    return section
+
+
+def _get(section: str, key: str, default: Any = None) -> Any:
+    return _section(section).get(key, default)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized not in {"true", "false"}:
+        raise ValueError(f"{name} must be either 'true' or 'false'.")
+    return normalized == "true"
+
+
+def _env_int(name: str, default: int) -> int:
+    return int(os.getenv(name, str(default)))
+
+
+def _env_float(name: str, default: float) -> float:
+    return float(os.getenv(name, str(default)))
+
+
+def _path(value: str | Path) -> Path:
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
+
+
+APP_CONFIG = _read_json(CONFIG_FILE)
+
+HERMES_CONFIG = _section("hermes")
+VOICE_BOT_CONFIG = _section("voice_bot")
+CLOUDFLARE_CONFIG = _section("cloudflare")
+RUNTIME_CONFIG = _section("runtime")
+WAKE_WORD_CONFIG = _section("wake_word")
+AUDIO_CONFIG = _section("audio")
+DASHBOARD_CONFIG = _section("dashboard")
+REMOTE_VOICE_CONFIG = _section("remote_voice")
+VOICE_CLIENT_CONFIG = _section("voice_client")
+
+
+DEFAULT_HERMES_GATEWAY_COMMAND = os.getenv(
+    "HERMES_GATEWAY_COMMAND",
+    str(_get("hermes", "gateway_command", "hermes gateway run --replace")),
 )
-DEFAULT_OPENAI_MODEL = os.getenv("OPENAI_MODEL", "hermes-model")
-CARTESIA_VOICE_ID = "71a7ad14-091c-4e8e-a314-022ece01c121"
+DEFAULT_HERMES_HOST = os.getenv("HERMES_HOST", str(_get("hermes", "host", "127.0.0.1")))
+DEFAULT_HERMES_PORT = _env_int("HERMES_PORT", int(_get("hermes", "port", 8642)))
 
-DEFAULT_CLOUDFLARED_BIN = "cloudflared"
-DEFAULT_CLOUDFLARED_WAIT_TIMEOUT_SECS = 90
-DEFAULT_CLOUDFLARED_QUICK_TUNNEL = "true"
-DEFAULT_CLOUDFLARED_TARGET_URL = f"http://localhost:{DEFAULT_HERMES_PORT}"
-
-DEFAULT_PID_FILE = PROJECT_ROOT / "run" / "bot.pid"
-DEFAULT_WAKEWORD_MODEL = os.getenv("WAKEWORD_MODEL", "hey jarvis")
-DEFAULT_THRESHOLD = float(os.getenv("WAKEWORD_THRESHOLD", "0.5"))
-DEFAULT_COOLDOWN_SECS = float(os.getenv("WAKEWORD_COOLDOWN_SECS", "8.0"))
-DEFAULT_VAD_THRESHOLD = float(os.getenv("WAKEWORD_VAD_THRESHOLD", "0.5"))
-DEFAULT_INFERENCE_FRAMEWORK = os.getenv("WAKEWORD_INFERENCE_FRAMEWORK", "onnx")
-
-SAMPLE_RATE = 16000
-CHUNK_SIZE = 1280
-
-DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "0.0.0.0")
-DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "8080"))
-DASHBOARD_DEBUG = os.getenv("DASHBOARD_DEBUG", "false").strip().lower() == "true"
-DASHBOARD_DEFAULT_USERNAME = os.getenv("DASHBOARD_DEFAULT_USERNAME", "admin")
-DASHBOARD_SESSION_TTL_HOURS = int(os.getenv("DASHBOARD_SESSION_TTL_HOURS", "12"))
-DASHBOARD_AUTH_FILE = Path(
-    os.getenv("DASHBOARD_AUTH_FILE", str(PROJECT_ROOT / "run" / "dashboard_auth.json"))
+LOCAL_OPENAI_BASE_URL = str(
+    _get(
+        "voice_bot",
+        "local_openai_base_url",
+        f"http://{DEFAULT_HERMES_HOST}:{DEFAULT_HERMES_PORT}/v1",
+    )
+).format(host=DEFAULT_HERMES_HOST, port=DEFAULT_HERMES_PORT)
+CLOUDFLARE_OPENAI_BASE_URL = str(
+    _get("voice_bot", "cloudflare_openai_base_url", "https://your-tunnel.trycloudflare.com/v1")
 )
-DASHBOARD_STATIC_DIR = PROJECT_ROOT / "dashboard" / "static"
+LOCAL_VOICE_TESTING = _env_bool(
+    "LOCAL_VOICE_TESTING", bool(_get("voice_bot", "local_voice_testing", True))
+)
+OPENAI_BASE_URL = LOCAL_OPENAI_BASE_URL if LOCAL_VOICE_TESTING else CLOUDFLARE_OPENAI_BASE_URL
+DEFAULT_OPENAI_MODEL = os.getenv(
+    "OPENAI_MODEL", str(_get("voice_bot", "openai_model", "hermes-model"))
+)
+CARTESIA_VOICE_ID = str(_get("voice_bot", "cartesia_voice_id", ""))
+
+DEFAULT_CLOUDFLARED_BIN = str(_get("cloudflare", "bin", "cloudflared"))
+DEFAULT_CLOUDFLARED_WAIT_TIMEOUT_SECS = int(
+    _get("cloudflare", "wait_timeout_secs", 90)
+)
+DEFAULT_CLOUDFLARED_QUICK_TUNNEL = str(_get("cloudflare", "quick_tunnel", "true"))
+DEFAULT_CLOUDFLARED_TARGET_URL = str(
+    _get("cloudflare", "target_url", f"http://localhost:{DEFAULT_HERMES_PORT}")
+).format(port=DEFAULT_HERMES_PORT)
+
+DEFAULT_PID_FILE = _path(str(_get("runtime", "pid_file", "run/bot.pid")))
+VOICE_RUNTIME_MODE = os.getenv(
+    "VOICE_RUNTIME_MODE", str(_get("runtime", "voice_runtime_mode", "local"))
+).strip().lower()
+if VOICE_RUNTIME_MODE not in {"local", "remote_daily"}:
+    raise ValueError("VOICE_RUNTIME_MODE must be either 'local' or 'remote_daily'.")
+
+DEFAULT_WAKEWORD_MODEL = os.getenv(
+    "WAKEWORD_MODEL", str(_get("wake_word", "model", "hey jarvis"))
+)
+DEFAULT_THRESHOLD = _env_float("WAKEWORD_THRESHOLD", float(_get("wake_word", "threshold", 0.5)))
+DEFAULT_COOLDOWN_SECS = _env_float(
+    "WAKEWORD_COOLDOWN_SECS", float(_get("wake_word", "cooldown_secs", 8.0))
+)
+DEFAULT_VAD_THRESHOLD = _env_float(
+    "WAKEWORD_VAD_THRESHOLD", float(_get("wake_word", "vad_threshold", 0.5))
+)
+DEFAULT_INFERENCE_FRAMEWORK = os.getenv(
+    "WAKEWORD_INFERENCE_FRAMEWORK",
+    str(_get("wake_word", "inference_framework", "onnx")),
+)
+
+SAMPLE_RATE = int(_get("audio", "sample_rate", 16000))
+CHUNK_SIZE = int(_get("audio", "chunk_size", 1280))
+
+DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", str(_get("dashboard", "host", "0.0.0.0")))
+DASHBOARD_PORT = _env_int("DASHBOARD_PORT", int(_get("dashboard", "port", 8080)))
+DASHBOARD_DEBUG = _env_bool("DASHBOARD_DEBUG", bool(_get("dashboard", "debug", False)))
+DASHBOARD_DEFAULT_USERNAME = os.getenv(
+    "DASHBOARD_DEFAULT_USERNAME",
+    str(_get("dashboard", "default_username", "admin")),
+)
+DASHBOARD_SESSION_TTL_HOURS = _env_int(
+    "DASHBOARD_SESSION_TTL_HOURS",
+    int(_get("dashboard", "session_ttl_hours", 12)),
+)
+DASHBOARD_AUTH_FILE = _path(
+    os.getenv("DASHBOARD_AUTH_FILE", str(_get("dashboard", "auth_file", "run/dashboard_auth.json")))
+)
+DASHBOARD_STATIC_DIR = _path(str(_get("dashboard", "static_dir", "dashboard/static")))
+
+USER_CONFIG_FILE = _path(
+    os.getenv("USER_CONFIG_FILE", str(_get("runtime", "user_config_file", "user.json")))
+)
+EIGI_API_KEY = os.getenv("EIGI_API_KEY", "").strip()
+
+VOICE_CLIENT_TYPE = os.getenv(
+    "VOICE_CLIENT_TYPE", str(_get("voice_client", "type", "native"))
+).strip().lower()
+if VOICE_CLIENT_TYPE not in {"native", "browser"}:
+    raise ValueError("VOICE_CLIENT_TYPE must be either 'native' or 'browser'.")
+VOICE_CLIENT_HOST = os.getenv("VOICE_CLIENT_HOST", str(_get("voice_client", "host", "127.0.0.1"))).strip()
+VOICE_CLIENT_PORT = _env_int("VOICE_CLIENT_PORT", int(_get("voice_client", "port", 8090)))
+VOICE_CLIENT_WEB_PORT = _env_int(
+    "VOICE_CLIENT_WEB_PORT",
+    int(_get("voice_client", "web_port", 5174)),
+)
+VOICE_CLIENT_BROWSER_BIN = os.getenv(
+    "VOICE_CLIENT_BROWSER_BIN",
+    str(_get("voice_client", "browser_bin", "")),
+).strip()
+VOICE_CLIENT_BROWSER_HEADLESS = _env_bool(
+    "VOICE_CLIENT_BROWSER_HEADLESS",
+    bool(_get("voice_client", "browser_headless", False)),
+)
+VOICE_CLIENT_NATIVE_BIN = os.getenv(
+    "VOICE_CLIENT_NATIVE_BIN",
+    str(_get("voice_client", "native_bin", "voice_client/native_daily/bin/pipecat-daily-client")),
+).strip()
+VOICE_CLIENT_NATIVE_CONFIG_FILE = os.getenv(
+    "VOICE_CLIENT_NATIVE_CONFIG_FILE",
+    str(_get("voice_client", "native_config_file", "voice_client/native_daily/config.json")),
+).strip()

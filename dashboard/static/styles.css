@@ -80,15 +80,18 @@ label {
 }
 
 input,
+select,
 button {
   min-height: 40px;
   border-radius: 6px;
   font: inherit;
 }
 
-input {
+input,
+select {
   border: 1px solid #c8d0da;
   padding: 8px 10px;
+  background: #ffffff;
 }
 
 button {

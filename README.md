@@ -13,6 +13,7 @@ This bot uses:
 ```text
 raspberrypi_voice_agent/
 ├── cloudflared/
+├── config.example.json
 ├── config.py
 ├── .env.example
 ├── .gitignore
@@ -35,9 +36,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+cp config.example.json config.json
 ```
 
-Fill in the API keys in `.env`.
+Fill in the API keys in `.env` and local device values in `config.json`.
 
 `OPENAI_API_KEY` can stay blank if your local gateway does not enforce auth. The bot falls back to a local placeholder key for the OpenAI-compatible client.
 
@@ -58,10 +60,14 @@ Set this in `.env` when testing through the Cloudflare tunnel instead:
 LOCAL_VOICE_TESTING=false
 ```
 
-The Cloudflare URL itself still lives in `config.py`:
+The Cloudflare URL itself lives in local `config.json`:
 
-```python
-CLOUDFLARE_OPENAI_BASE_URL = "https://your-tunnel.trycloudflare.com/v1"
+```json
+{
+  "voice_bot": {
+    "cloudflare_openai_base_url": "https://your-tunnel.trycloudflare.com/v1"
+  }
+}
 ```
 
 Set `LOCAL_VOICE_TESTING=true` to switch back to localhost.
@@ -111,10 +117,15 @@ The dashboard currently supports:
 - service status
 - WiFi scanning and connection through `nmcli`
 - Bluetooth scanning, pairing, trusting, connecting, and disconnecting through `bluetoothctl`
+- remote Daily voice client settings for low-resource devices
 - dashboard password change
 
 The password hash is stored in `run/dashboard_auth.json` by default. The plain
 password is not stored.
+
+Template settings live in `config.example.json`. Local settings live in ignored
+`config.json`. Secrets stay in `.env`; per-device non-secret settings are saved
+to `user.json`.
 
 The bot has two separate idle controls:
 
@@ -164,13 +175,124 @@ The bot uses the Raspberry Pi's default PipeWire audio devices, so paired
 AirPods or any configured default microphone/speaker can be used directly
 without opening a browser UI.
 
-Those default Python-side values now live in `config.py`.
+Those defaults now live in local `config.json`, with a committed template in
+`config.example.json`.
 
 If the bot is already running, the listener will not start a second copy.
 
+### Remote Daily/Pipecat client mode
+
+For lower-resource hardware, set the wake listener to launch a remote Daily
+client instead of running the full Pipecat bot locally:
+
+```bash
+VOICE_RUNTIME_MODE=remote_daily
+EIGI_API_KEY=<public-api-key>
+VOICE_CLIENT_TYPE=native
+```
+
+Default remote values can live in local `config.json`. For a specific device,
+create `user.json` from the example:
+
+```bash
+cp user.example.json user.json
+```
+
+Edit `user.json`:
+
+```json
+{
+  "remote_voice": {
+    "daily_session_url": "http://localhost:4000/v1/public/daily",
+    "agent_id": "your-agent-id",
+    "conversation_metadata": {},
+    "conversation_visibility": false,
+    "conversation_config_type": "VOICE"
+  },
+  "voice_client": {
+    "type": "native",
+    "native_bin": "voice_client/native_daily/bin/pipecat-daily-client",
+    "native_config_file": "voice_client/native_daily/config.json"
+  }
+}
+```
+
+In this mode the wake listener still detects `hey jarvis` locally, then starts:
+
+```bash
+python -m voice_client.runner
+```
+
+The runner starts a local broker, requests `dailyRoom` and `dailyToken` from the
+eigi.ai `/v1/public/daily` endpoint, and launches the selected audio client. The
+user does not need to manually open a browser.
+
+#### Native C++ Daily client
+
+The production no-browser path uses the Pipecat C++ Daily client with PortAudio.
+Build it on the Pi:
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build git libcurl4-openssl-dev libportaudio2 portaudio19-dev
+```
+
+Download and extract the Daily Core C++ SDK for Linux `aarch64` from:
+
+```text
+https://github.com/daily-co/daily-core-sdk/releases
+```
+
+Then run:
+
+```bash
+export DAILY_CORE_PATH=/path/to/daily-core-sdk
+./voice_client/native_daily/scripts/build_native_daily_client.sh
+```
+
+The script installs:
+
+```text
+voice_client/native_daily/bin/pipecat-daily-client
+```
+
+#### Browser fallback
+
+If native is not available yet, set this in `user.json`:
+
+```json
+{
+  "voice_client": {
+    "type": "browser"
+  }
+}
+```
+
+Then build the browser client once on the Pi:
+
+```bash
+cd voice_client/web
+npm install
+npm run build
+```
+
+The Pi needs Chromium installed:
+
+```bash
+sudo apt install -y chromium-browser
+```
+
+If your Chromium binary has a different name, set:
+
+```bash
+VOICE_CLIENT_BROWSER_BIN=/path/to/chromium
+```
+
 ### Wake listener environment settings
 
-The default values come from `config.py`. If you want to override them without editing code, set these values in `.env`:
+The default values come from local `config.json`, falling back to
+`config.example.json` when no local config exists. If you want to override them
+without editing JSON, set these values in `.env`:
 
 - `WAKEWORD_MODEL`: pretrained model name such as `hey jarvis`, `alexa`, or a custom model path
 - `WAKEWORD_THRESHOLD`: minimum score required to trigger the bot
@@ -202,7 +324,9 @@ The repository now includes a boot stack that can start all required local servi
 
 ### Configure the Hermes gateway command
 
-The startup script reads its default Hermes settings from `config.py`. By default it uses `hermes gateway run --replace` and expects the gateway on `http://127.0.0.1:8642/v1`.
+The startup script reads its default Hermes settings from local `config.json`,
+falling back to `config.example.json`. By default it uses `hermes gateway run
+--replace` and expects the gateway on `http://127.0.0.1:8642/v1`.
 
 If you want to override that without editing code, you can still set:
 
@@ -222,7 +346,8 @@ cloudflared tunnel --url http://localhost:8642
 
 The boot script runs that same pattern automatically. By default it targets `http://localhost:8642`.
 
-The startup script reads its default Cloudflare settings from `config.py`. By default it uses:
+The startup script reads its default Cloudflare settings from local
+`config.json`, falling back to `config.example.json`. By default it uses:
 
 ```bash
 cloudflared tunnel --url http://localhost:8642

@@ -28,6 +28,28 @@ another strong authentication layer.
 For now, the local dashboard should show the local URL users can open after they
 join the same WiFi as the Pi.
 
+## Remote Pipecat Client
+
+For lower-resource devices, the wake listener can start a remote Daily client
+instead of the local Pipecat bot. The device keeps wake-word detection local, then
+requests a Daily room/token from the vaani_core public Daily endpoint and joins
+as an audio-only client.
+
+Current direction:
+
+- `VOICE_RUNTIME_MODE=local` runs `python -m voice_bot.bot`
+- `VOICE_RUNTIME_MODE=remote_daily` runs `python -m voice_client.runner`
+- `EIGI_API_KEY` stays in `.env`
+- template agent ID and `/v1/public/daily` URL live in `config.example.json`
+- local device values live in ignored `config.json`
+- per-device agent ID and `/v1/public/daily` URL live in `user.json` or are
+  saved from the local dashboard
+- `VOICE_CLIENT_TYPE=native` is the production no-browser path
+- `VOICE_CLIENT_TYPE=browser` is a Raspberry Pi fallback/debug path
+
+The native client uses the Pipecat C++ Daily transport with PortAudio. It is the
+preferred path for lower-resource devices that should not depend on Chromium.
+
 ## Wake Word Options
 
 Current implementation:

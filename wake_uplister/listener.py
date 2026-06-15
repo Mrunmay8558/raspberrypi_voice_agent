@@ -22,6 +22,7 @@ from config import DEFAULT_VAD_THRESHOLD
 from config import DEFAULT_WAKEWORD_MODEL
 from config import PROJECT_ROOT
 from config import SAMPLE_RATE
+from config import VOICE_RUNTIME_MODE
 
 
 def parse_args() -> argparse.Namespace:
@@ -119,7 +120,7 @@ def looks_like_bot_process(pid: int) -> bool:
     except OSError:
         return True
 
-    return "voice_bot.bot" in cmdline
+    return "voice_bot.bot" in cmdline or "voice_client.runner" in cmdline
 
 
 def active_bot_pid(pid_file: Path) -> int | None:
@@ -142,10 +143,18 @@ def start_bot(pid_file: Path) -> subprocess.Popen[bytes] | None:
         logger.info("Bot already running with pid {}", current_pid)
         return None
 
-    command = [sys.executable, "-m", "voice_bot.bot"]
+    if VOICE_RUNTIME_MODE == "remote_daily":
+        command = [sys.executable, "-m", "voice_client.runner"]
+    else:
+        command = [sys.executable, "-m", "voice_bot.bot"]
     process = subprocess.Popen(command, cwd=PROJECT_ROOT, start_new_session=True)
     write_pid(pid_file, process.pid)
-    logger.info("Started bot process pid={} command={}", process.pid, " ".join(command))
+    logger.info(
+        "Started {} process pid={} command={}",
+        VOICE_RUNTIME_MODE,
+        process.pid,
+        " ".join(command),
+    )
     return process
 
 
@@ -239,49 +248,63 @@ def run_listener(args: argparse.Namespace) -> None:
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
 
-    with sd.RawInputStream(
-        samplerate=input_sample_rate,
-        blocksize=input_chunk_size,
-        dtype="int16",
-        channels=1,
-        device=input_device,
-    ) as stream:
-        while not stop_requested:
-            bot_process = reap_bot_process(bot_process, pid_file)
-            raw_audio, overflowed = stream.read(input_chunk_size)
-            if overflowed:
-                logger.warning("Wake listener audio input overflowed")
+    while not stop_requested:
+        audio_buffer = np.array([], dtype=np.int16)
+        with sd.RawInputStream(
+            samplerate=input_sample_rate,
+            blocksize=input_chunk_size,
+            dtype="int16",
+            channels=1,
+            device=input_device,
+        ) as stream:
+            while not stop_requested:
+                bot_process = reap_bot_process(bot_process, pid_file)
+                raw_audio, overflowed = stream.read(input_chunk_size)
+                if overflowed:
+                    logger.warning("Wake listener audio input overflowed")
 
-            prepared_audio = prepare_audio_frame(
-                np.frombuffer(raw_audio, dtype=np.int16), input_sample_rate
-            )
-            audio_buffer = np.concatenate((audio_buffer, prepared_audio))
-
-            while audio_buffer.size >= CHUNK_SIZE:
-                frame = audio_buffer[:CHUNK_SIZE]
-                audio_buffer = audio_buffer[CHUNK_SIZE:]
-
-                predictions = model.predict(frame)
-                score = float(predictions.get(loaded_name, 0.0))
-
-                logger.debug("Wake-word score {}={:.3f}", loaded_name, score)
-
-                now = time.monotonic()
-                if score < args.threshold:
-                    continue
-                if now - last_trigger_time < args.cooldown_secs:
-                    logger.info("Wake word detected but cooldown is still active")
-                    continue
-
-                logger.info(
-                    "Wake word '{}' detected with score {:.3f}",
-                    loaded_name,
-                    score,
+                prepared_audio = prepare_audio_frame(
+                    np.frombuffer(raw_audio, dtype=np.int16), input_sample_rate
                 )
-                launched_process = start_bot(pid_file)
-                if launched_process is not None:
-                    bot_process = launched_process
-                last_trigger_time = now
+                audio_buffer = np.concatenate((audio_buffer, prepared_audio))
+
+                wake_detected = False
+                while audio_buffer.size >= CHUNK_SIZE:
+                    frame = audio_buffer[:CHUNK_SIZE]
+                    audio_buffer = audio_buffer[CHUNK_SIZE:]
+
+                    predictions = model.predict(frame)
+                    score = float(predictions.get(loaded_name, 0.0))
+
+                    logger.debug("Wake-word score {}={:.3f}", loaded_name, score)
+
+                    now = time.monotonic()
+                    if score < args.threshold:
+                        continue
+                    if now - last_trigger_time < args.cooldown_secs:
+                        logger.info("Wake word detected but cooldown is still active")
+                        continue
+
+                    logger.info(
+                        "Wake word '{}' detected with score {:.3f}",
+                        loaded_name,
+                        score,
+                    )
+                    launched_process = start_bot(pid_file)
+                    if launched_process is not None:
+                        bot_process = launched_process
+                        wake_detected = True
+                    last_trigger_time = now
+                    break
+
+                if wake_detected:
+                    logger.info("Releasing wake listener microphone during session")
+                    break
+
+        while bot_process is not None and not stop_requested:
+            bot_process = reap_bot_process(bot_process, pid_file)
+            if bot_process is not None:
+                time.sleep(1)
 
 
 def main() -> None:
