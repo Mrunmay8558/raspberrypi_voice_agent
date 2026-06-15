@@ -58,6 +58,7 @@ python -m voice_bot.bot
 python -m wake_uplister.listener
 python -m voice_client.runner
 python -m dashboard.main
+python -m dashboard.cli status
 ```
 
 Native Daily client build:
@@ -123,6 +124,8 @@ Dashboard structure:
 
 - `dashboard/main.py` is the single Python entrypoint for both `app` and
   `main()`
+- `dashboard/cli.py` is the no-browser setup interface and should reuse
+  dashboard controllers instead of duplicating service logic
 - FastAPI bootstrap lives in `dashboard/core/apis/api.py`
 - auth/session dependency functions live in
   `dashboard/core/apis/dependencies.py`

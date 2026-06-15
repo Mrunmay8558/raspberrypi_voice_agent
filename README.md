@@ -172,6 +172,14 @@ Run the local dashboard:
 python -m dashboard.main
 ```
 
+Run the no-browser setup CLI:
+
+```bash
+python -m dashboard.cli status
+python -m dashboard.cli wifi scan
+python -m dashboard.cli bluetooth devices
+```
+
 ## Dashboard
 
 The dashboard is a local setup surface intended for devices on the same LAN or
@@ -208,6 +216,24 @@ The dashboard currently supports:
 - Bluetooth management through `bluetoothctl`
 - remote voice settings
 - dashboard password change
+
+For hardware without a browser, use the CLI version of the same setup surface:
+
+```bash
+python -m dashboard.cli status
+python -m dashboard.cli wifi scan
+python -m dashboard.cli wifi connect "SSID_NAME"
+python -m dashboard.cli bluetooth scan
+python -m dashboard.cli bluetooth connect AA:BB:CC:DD:EE:FF
+python -m dashboard.cli remote-voice show
+python -m dashboard.cli api-keys show
+```
+
+Add `--json` before the command when another tool needs structured output:
+
+```bash
+python -m dashboard.cli --json status
+```
 
 ## Wake Word
 
