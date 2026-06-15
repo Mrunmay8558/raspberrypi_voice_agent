@@ -6,7 +6,7 @@ normalizes command failures into HTTP-safe errors for the API layer.
 
 from fastapi import HTTPException
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from dashboard.core.apis.schemas.responses.wifi_response import WifiConnectResponse
 from dashboard.core.apis.schemas.responses.wifi_response import WifiNetwork
 from dashboard.core.services import wifi_service

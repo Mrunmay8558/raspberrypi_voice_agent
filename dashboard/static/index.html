@@ -8,15 +8,22 @@
   </head>
   <body>
     <main class="shell">
-      <section id="login-panel" class="panel">
-        <h1>Voice Agent Dashboard</h1>
+      <section id="login-panel" class="login-panel">
+        <div class="login-copy">
+          <p class="eyebrow">Eigi device setup</p>
+          <h1>Voice Agent Dashboard</h1>
+          <p class="subtle">
+            Configure WiFi, Bluetooth, API keys, and voice runtime from the
+            local device dashboard.
+          </p>
+        </div>
         <form id="login-form" class="form">
           <label>
             Username
             <input
               id="username"
               autocomplete="username"
-              value="admin"
+              placeholder="Username"
               required
             />
           </label>
@@ -26,6 +33,7 @@
               id="password"
               type="password"
               autocomplete="current-password"
+              placeholder="Password"
               required
             />
           </label>
@@ -37,8 +45,9 @@
       <section id="dashboard-panel" class="hidden">
         <header class="topbar">
           <div>
+            <p class="eyebrow">Local setup</p>
             <h1>Voice Agent Dashboard</h1>
-            <p id="local-url"></p>
+            <p id="local-url" class="subtle"></p>
           </div>
           <button id="logout-button" type="button">Log out</button>
         </header>
@@ -81,7 +90,7 @@
           <article class="panel">
             <h2>Password</h2>
             <form id="password-form" class="form compact">
-              <input id="password-username" value="admin" required />
+              <input id="password-username" placeholder="Username" required />
               <input
                 id="current-password"
                 type="password"

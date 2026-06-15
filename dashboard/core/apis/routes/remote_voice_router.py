@@ -5,7 +5,7 @@ from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import status
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from dashboard.core.apis.schemas.requests.remote_voice_request import ApiKeySettingsUpdate
 from dashboard.core.apis.schemas.requests.remote_voice_request import RemoteVoiceSettingsUpdate
 from dashboard.core.apis.schemas.responses.remote_voice_response import ApiKeySettings
@@ -16,7 +16,7 @@ from dashboard.core.apis.dependencies import require_session
 logging = logger(__name__)
 
 remote_voice_router = APIRouter(
-    prefix="/api/remote-voice",
+    prefix="/remote-voice",
     tags=["remote-voice"],
     dependencies=[Depends(require_session)],
 )

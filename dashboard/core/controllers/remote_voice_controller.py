@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from env_store import public_secret_status
 from env_store import read_secret
 from env_store import write_env_values

@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import field_validator
 
 
 class LoginRequest(BaseModel):
@@ -16,4 +17,14 @@ class ChangePasswordRequest(BaseModel):
 
     username: str = Field(min_length=1, max_length=64)
     current_password: str = Field(min_length=1, max_length=256)
-    new_password: str = Field(min_length=12, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, value: str) -> str:
+        """Require a number and a special character in the new password."""
+        if not any(character.isdigit() for character in value):
+            raise ValueError("Password must include at least one number.")
+        if not any(not character.isalnum() for character in value):
+            raise ValueError("Password must include at least one special character.")
+        return value

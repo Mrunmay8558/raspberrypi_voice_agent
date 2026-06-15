@@ -140,7 +140,13 @@ On first run, the dashboard creates a local credential store at:
 run/dashboard_auth.json
 ```
 
-The generated password is printed in the dashboard logs:
+By default, the first-run username is generated in this format:
+
+```text
+EIGIxxxxxx
+```
+
+The generated username and password are printed in the dashboard logs:
 
 ```bash
 journalctl -u dashboard.service -n 100 --no-pager

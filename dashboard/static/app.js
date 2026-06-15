@@ -2,9 +2,10 @@ const loginPanel = document.querySelector("#login-panel");
 const dashboardPanel = document.querySelector("#dashboard-panel");
 const loginMessage = document.querySelector("#login-message");
 const appMessage = document.querySelector("#app-message");
+const API_BASE = "/api/v1";
 
 async function request(path, options = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
   });
@@ -31,7 +32,7 @@ function setMessage(text) {
 }
 
 async function loadStatus() {
-  const status = await request("/api/system/status");
+  const status = await request("/system/status");
   document.querySelector("#local-url").textContent = status.local_url;
   const services = document.querySelector("#services");
   services.innerHTML = "";
@@ -51,7 +52,7 @@ async function loadStatus() {
 
 async function loadWifi() {
   setMessage("Scanning WiFi networks...");
-  const networks = await request("/api/wifi/networks");
+  const networks = await request("/wifi/networks");
   const list = document.querySelector("#wifi-list");
   list.innerHTML = "";
   networks.forEach((network) => {
@@ -72,7 +73,7 @@ async function loadBluetooth(scan = false) {
     scan ? "Scanning Bluetooth devices..." : "Loading Bluetooth devices...",
   );
   const devices = await request(
-    scan ? "/api/bluetooth/scan" : "/api/bluetooth/devices",
+    scan ? "/bluetooth/scan" : "/bluetooth/devices",
     {
       method: scan ? "POST" : "GET",
     },
@@ -92,8 +93,8 @@ async function loadBluetooth(scan = false) {
     `;
     row.querySelector("button").addEventListener("click", async () => {
       const path = device.connected
-        ? `/api/bluetooth/disconnect/${encodeURIComponent(device.mac)}`
-        : "/api/bluetooth/connect";
+        ? `/bluetooth/disconnect/${encodeURIComponent(device.mac)}`
+        : "/bluetooth/connect";
       const body = device.connected
         ? undefined
         : JSON.stringify({ mac: device.mac, pair: true, trust: true });
@@ -106,7 +107,7 @@ async function loadBluetooth(scan = false) {
 }
 
 async function loadRemoteVoiceSettings() {
-  const settings = await request("/api/remote-voice/settings");
+  const settings = await request("/remote-voice/settings");
   document.querySelector("#runtime-mode").value = settings.runtime_mode || "local";
   document.querySelector("#public-api-base-url").value =
     settings.public_api_base_url || "";
@@ -133,7 +134,7 @@ async function loadRemoteVoiceSettings() {
 }
 
 async function loadApiKeyStatus() {
-  const status = await request("/api/remote-voice/api-keys");
+  const status = await request("/remote-voice/api-keys");
   const list = document.querySelector("#api-key-status");
   list.innerHTML = "";
   Object.entries(status).forEach(([key, value]) => {
@@ -149,7 +150,7 @@ async function loadApiKeyStatus() {
 
 async function loadAgents() {
   setMessage("Loading Eigi agents...");
-  const payload = await request("/api/remote-voice/agents?page_size=100");
+  const payload = await request("/remote-voice/agents?page_size=100");
   const agents = payload.agents || [];
   const select = document.querySelector("#agent-select");
   const currentAgentId = document.querySelector("#eigi-agent-id").value;
@@ -178,7 +179,7 @@ async function loadDynamicVariables(agentId) {
     return;
   }
   const payload = await request(
-    `/api/remote-voice/agents/${encodeURIComponent(agentId)}/dynamic-variables`,
+    `/remote-voice/agents/${encodeURIComponent(agentId)}/dynamic-variables`,
   );
   const variables = payload.dynamic_variables || [];
   if (!variables.length) {
@@ -220,13 +221,15 @@ document
     event.preventDefault();
     loginMessage.textContent = "";
     try {
-      await request("/api/auth/login", {
+      await request("/auth/login", {
         method: "POST",
         body: JSON.stringify({
           username: document.querySelector("#username").value,
           password: document.querySelector("#password").value,
         }),
       });
+      document.querySelector("#password-username").value =
+        document.querySelector("#username").value.trim();
       showDashboard();
       await Promise.all([
         loadStatus(),
@@ -241,7 +244,7 @@ document
   });
 
 document.querySelector("#logout-button").addEventListener("click", async () => {
-  await request("/api/auth/logout", { method: "POST", body: "{}" });
+  await request("/auth/logout", { method: "POST", body: "{}" });
   window.location.reload();
 });
 
@@ -271,7 +274,7 @@ document
   .addEventListener("submit", async (event) => {
     event.preventDefault();
     setMessage("Connecting WiFi...");
-    await request("/api/wifi/connect", {
+    await request("/wifi/connect", {
       method: "POST",
       body: JSON.stringify({
         ssid: document.querySelector("#wifi-ssid").value,
@@ -285,7 +288,7 @@ document
   .querySelector("#password-form")
   .addEventListener("submit", async (event) => {
     event.preventDefault();
-    await request("/api/auth/password", {
+    await request("/auth/password", {
       method: "POST",
       body: JSON.stringify({
         username: document.querySelector("#password-username").value,
@@ -329,7 +332,7 @@ document
       native_bin: document.querySelector("#native-bin").value,
       native_config_file: document.querySelector("#native-config-file").value,
     };
-    await request("/api/remote-voice/settings", {
+    await request("/remote-voice/settings", {
       method: "PUT",
       body: JSON.stringify(payload),
     });
@@ -353,7 +356,7 @@ document
         payload[key] = value.trim();
       }
     });
-    await request("/api/remote-voice/api-keys", {
+    await request("/remote-voice/api-keys", {
       method: "PUT",
       body: JSON.stringify(payload),
     });

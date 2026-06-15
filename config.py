@@ -189,8 +189,8 @@ DASHBOARD_PORT = _env_int("DASHBOARD_PORT", int(_get("dashboard", "port", 8080))
 DASHBOARD_DEBUG = _env_bool("DASHBOARD_DEBUG", bool(_get("dashboard", "debug", False)))
 DASHBOARD_DEFAULT_USERNAME = os.getenv(
     "DASHBOARD_DEFAULT_USERNAME",
-    str(_get("dashboard", "default_username", "admin")),
-)
+    str(_get("dashboard", "default_username", "")),
+).strip()
 DASHBOARD_SESSION_TTL_HOURS = _env_int(
     "DASHBOARD_SESSION_TTL_HOURS",
     int(_get("dashboard", "session_ttl_hours", 12)),

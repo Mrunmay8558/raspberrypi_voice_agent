@@ -2,7 +2,7 @@
 
 import subprocess
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 
 logging = logger(__name__)
 

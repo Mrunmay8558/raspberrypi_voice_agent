@@ -203,7 +203,8 @@ or:
 http://<pi-ip-address>:8080
 ```
 
-On first run, the dashboard generates a password and logs it. Check:
+On first run, the dashboard generates a username like `EIGIxxxxxx` and a
+password, then logs both. Check:
 
 ```bash
 journalctl -u dashboard.service -n 80 --no-pager

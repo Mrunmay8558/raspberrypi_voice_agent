@@ -4,10 +4,12 @@ from fastapi import APIRouter
 from fastapi import Cookie
 from fastapi import Depends
 from fastapi import HTTPException
+from fastapi import Request
 from fastapi import Response
 from fastapi import status
 
-from dashboard.commons.logger import logger
+from config import DASHBOARD_SESSION_TTL_HOURS
+from dashboard.core import logger
 from dashboard.core.apis.schemas.requests.auth_request import ChangePasswordRequest
 from dashboard.core.apis.schemas.requests.auth_request import LoginRequest
 from dashboard.core.apis.schemas.responses.auth_response import AuthResponse
@@ -17,11 +19,22 @@ from dashboard.core.apis.dependencies import require_session
 
 logging = logger(__name__)
 
-auth_router = APIRouter(prefix="/api/auth", tags=["auth"])
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _is_secure_request(request: Request) -> bool:
+    """Return whether session cookies should use the Secure flag."""
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    return request.url.scheme == "https" or forwarded_proto.lower() == "https"
 
 
 @auth_router.post("/login", response_model=AuthResponse)
-def login(payload: LoginRequest, response: Response, auth_store=Depends(get_auth_store)):
+def login(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    auth_store=Depends(get_auth_store),
+):
     """
     Create a dashboard session cookie.
 
@@ -33,7 +46,7 @@ def login(payload: LoginRequest, response: Response, auth_store=Depends(get_auth
         AuthResponse: Login operation result.
     """
     try:
-        logging.info("Calling POST /api/auth/login endpoint username=%s", payload.username)
+        logging.info("Calling POST /api/v1/auth/login endpoint username=%s", payload.username)
         if not auth_store.verify_password(payload.username, payload.password):
             logging.warning("Dashboard login failed username=%s", payload.username)
             raise HTTPException(
@@ -46,14 +59,16 @@ def login(payload: LoginRequest, response: Response, auth_store=Depends(get_auth
             token,
             httponly=True,
             samesite="strict",
-            max_age=60 * 60 * 12,
+            secure=_is_secure_request(request),
+            max_age=60 * 60 * DASHBOARD_SESSION_TTL_HOURS,
+            path="/",
         )
         return AuthResponse(ok=True)
     except HTTPException as httperror:
-        logging.error("Error in POST /api/auth/login endpoint: %s", httperror)
+        logging.error("Error in POST /api/v1/auth/login endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in POST /api/auth/login endpoint: %s", error)
+        logging.error("Error in POST /api/v1/auth/login endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
@@ -73,15 +88,15 @@ def logout(
         AuthResponse: Logout operation result.
     """
     try:
-        logging.info("Calling POST /api/auth/logout endpoint")
+        logging.info("Calling POST /api/v1/auth/logout endpoint")
         auth_store.revoke_session(session_token)
-        response.delete_cookie(SESSION_COOKIE_NAME)
+        response.delete_cookie(SESSION_COOKIE_NAME, path="/", samesite="strict")
         return AuthResponse(ok=True)
     except HTTPException as httperror:
-        logging.error("Error in POST /api/auth/logout endpoint: %s", httperror)
+        logging.error("Error in POST /api/v1/auth/logout endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in POST /api/auth/logout endpoint: %s", error)
+        logging.error("Error in POST /api/v1/auth/logout endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
@@ -107,7 +122,7 @@ def change_password(
         AuthResponse: Password change operation result.
     """
     try:
-        logging.info("Calling POST /api/auth/password endpoint username=%s", payload.username)
+        logging.info("Calling POST /api/v1/auth/password endpoint username=%s", payload.username)
         if not auth_store.change_password(
             payload.username, payload.current_password, payload.new_password
         ):
@@ -118,10 +133,10 @@ def change_password(
             )
         return AuthResponse(ok=True)
     except HTTPException as httperror:
-        logging.error("Error in POST /api/auth/password endpoint: %s", httperror)
+        logging.error("Error in POST /api/v1/auth/password endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in POST /api/auth/password endpoint: %s", error)
+        logging.error("Error in POST /api/v1/auth/password endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),

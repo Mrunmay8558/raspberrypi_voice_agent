@@ -5,7 +5,7 @@ from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import status
 
-from dashboard.commons.logger import logger
+from dashboard.core import logger
 from dashboard.core.apis.schemas.requests.bluetooth_request import BluetoothConnectRequest
 from dashboard.core.apis.schemas.responses.bluetooth_response import BluetoothActionResponse
 from dashboard.core.apis.schemas.responses.bluetooth_response import BluetoothDevice
@@ -15,7 +15,7 @@ from dashboard.core.apis.dependencies import require_session
 logging = logger(__name__)
 
 bluetooth_router = APIRouter(
-    prefix="/api/bluetooth",
+    prefix="/bluetooth",
     tags=["bluetooth"],
     dependencies=[Depends(require_session)],
 )
@@ -30,13 +30,13 @@ def devices():
         list[BluetoothDevice]: Devices known to bluetoothctl.
     """
     try:
-        logging.info("Calling GET /api/bluetooth/devices endpoint")
+        logging.info("Calling GET /api/v1/bluetooth/devices endpoint")
         return BluetoothController().list_devices()
     except HTTPException as httperror:
-        logging.error("Error in GET /api/bluetooth/devices endpoint: %s", httperror)
+        logging.error("Error in GET /api/v1/bluetooth/devices endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in GET /api/bluetooth/devices endpoint: %s", error)
+        logging.error("Error in GET /api/v1/bluetooth/devices endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
@@ -52,13 +52,13 @@ def scan():
         list[BluetoothDevice]: Devices visible after the scan.
     """
     try:
-        logging.info("Calling POST /api/bluetooth/scan endpoint")
+        logging.info("Calling POST /api/v1/bluetooth/scan endpoint")
         return BluetoothController().scan_devices()
     except HTTPException as httperror:
-        logging.error("Error in POST /api/bluetooth/scan endpoint: %s", httperror)
+        logging.error("Error in POST /api/v1/bluetooth/scan endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in POST /api/bluetooth/scan endpoint: %s", error)
+        logging.error("Error in POST /api/v1/bluetooth/scan endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
@@ -77,13 +77,13 @@ def connect(payload: BluetoothConnectRequest):
         BluetoothActionResponse: Command result.
     """
     try:
-        logging.info("Calling POST /api/bluetooth/connect endpoint")
+        logging.info("Calling POST /api/v1/bluetooth/connect endpoint")
         return BluetoothController().connect_device(payload.mac, payload.pair, payload.trust)
     except HTTPException as httperror:
-        logging.error("Error in POST /api/bluetooth/connect endpoint: %s", httperror)
+        logging.error("Error in POST /api/v1/bluetooth/connect endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in POST /api/bluetooth/connect endpoint: %s", error)
+        logging.error("Error in POST /api/v1/bluetooth/connect endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),
@@ -102,13 +102,13 @@ def disconnect(mac: str):
         BluetoothActionResponse: Command result.
     """
     try:
-        logging.info("Calling POST /api/bluetooth/disconnect/%s endpoint", mac)
+        logging.info("Calling POST /api/v1/bluetooth/disconnect/%s endpoint", mac)
         return BluetoothController().disconnect_device(mac)
     except HTTPException as httperror:
-        logging.error("Error in POST /api/bluetooth/disconnect endpoint: %s", httperror)
+        logging.error("Error in POST /api/v1/bluetooth/disconnect endpoint: %s", httperror)
         raise httperror
     except Exception as error:
-        logging.error("Error in POST /api/bluetooth/disconnect endpoint: %s", error)
+        logging.error("Error in POST /api/v1/bluetooth/disconnect endpoint: %s", error)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(error),

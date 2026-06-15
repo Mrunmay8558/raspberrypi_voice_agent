@@ -37,7 +37,7 @@
     "host": "0.0.0.0",
     "port": 8080,
     "debug": false,
-    "default_username": "admin",
+    "default_username": "",
     "session_ttl_hours": 12,
     "auth_file": "run/dashboard_auth.json",
     "static_dir": "dashboard/static"
