@@ -9,6 +9,10 @@ async function request(path, options = {}) {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
   });
+  if (response.status === 401) {
+    showLogin("Session expired. Please log in again.");
+    throw new Error("Authentication required");
+  }
   if (!response.ok) {
     let detail = `Request failed: ${response.status}`;
     try {
@@ -25,6 +29,14 @@ async function request(path, options = {}) {
 function showDashboard() {
   loginPanel.classList.add("hidden");
   dashboardPanel.classList.remove("hidden");
+}
+
+function showLogin(message = "") {
+  dashboardPanel.classList.add("hidden");
+  loginPanel.classList.remove("hidden");
+  document.querySelector("#password").value = "";
+  loginMessage.textContent = message;
+  setMessage("");
 }
 
 function setMessage(text) {
@@ -245,7 +257,7 @@ document
 
 document.querySelector("#logout-button").addEventListener("click", async () => {
   await request("/auth/logout", { method: "POST", body: "{}" });
-  window.location.reload();
+  showLogin("Logged out.");
 });
 
 document.querySelector("#refresh-status").addEventListener("click", loadStatus);
