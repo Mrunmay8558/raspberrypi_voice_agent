@@ -21,6 +21,9 @@ class RemoteVoiceSettings(BaseModel):
     native_config_file: str = ""
     api_key_configured: bool = False
     api_key_preview: str = ""
+    restart_attempted: bool = False
+    restart_succeeded: bool = False
+    restart_message: str = ""
 
 
 class SecretStatus(BaseModel):

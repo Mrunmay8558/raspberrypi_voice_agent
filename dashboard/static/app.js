@@ -349,11 +349,19 @@ document
         ? document.querySelector("#is-test-call").checked
         : false,
     };
-    await request("/remote-voice/settings", {
+    const response = await request("/remote-voice/settings", {
       method: "PUT",
       body: JSON.stringify(payload),
     });
     await loadRemoteVoiceSettings();
+    if (response.restart_attempted) {
+      setMessage(
+        response.restart_succeeded
+          ? response.restart_message || "Remote voice settings saved and wake service restarted."
+          : response.restart_message || "Remote voice settings saved. Restart voice-bot-wake.service manually.",
+      );
+      return;
+    }
     setMessage("Remote voice settings saved.");
   });
 

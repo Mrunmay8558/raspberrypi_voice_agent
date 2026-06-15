@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from dashboard.core import logger
+from dashboard.core.services.system_service import restart_service
 from env_store import public_secret_status
 from env_store import read_secret
 from env_store import write_env_values
@@ -44,6 +45,7 @@ class RemoteVoiceController:
             dict[str, Any]: Current settings after persistence.
         """
         logging.info("RemoteVoiceController.update_settings")
+        previous = public_remote_voice_config()
         if updates.get("runtime_mode") == "local":
             for key in (
                 "public_api_base_url",
@@ -67,7 +69,18 @@ class RemoteVoiceController:
         if updates.get("public_api_base_url") and not updates.get("daily_session_url"):
             updates["daily_session_url"] = self._daily_url(updates["public_api_base_url"])
         save_remote_voice_config(updates)
-        return public_remote_voice_config()
+        current = public_remote_voice_config()
+
+        restart_needed = self._restart_needed(previous, current)
+        restart_succeeded = False
+        restart_message = ""
+        if restart_needed:
+            restart_succeeded, restart_message = restart_service("voice-bot-wake.service")
+
+        current["restart_attempted"] = restart_needed
+        current["restart_succeeded"] = restart_succeeded
+        current["restart_message"] = restart_message
+        return current
 
     def get_api_keys(self) -> dict[str, dict[str, str | bool]]:
         """Return masked dashboard-managed API key status.
@@ -190,3 +203,29 @@ class RemoteVoiceController:
     def _daily_url(public_api_base_url: str) -> str:
         """Build the Daily session URL from an Eigi public API base URL."""
         return f"{public_api_base_url.rstrip('/')}/daily"
+
+    @staticmethod
+    def _restart_needed(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+        """Return whether wake-listener routing should be reloaded.
+
+        Args:
+            previous: Settings before the update.
+            current: Settings after the update.
+
+        Returns:
+            bool: `True` when the wake listener should be restarted to pick up
+            the new runtime mode or remote voice configuration.
+        """
+        keys = (
+            "runtime_mode",
+            "public_api_base_url",
+            "daily_session_url",
+            "agent_id",
+            "conversation_metadata",
+            "dynamic_variables",
+            "conversation_config_type",
+            "is_test_call",
+            "native_bin",
+            "native_config_file",
+        )
+        return any(previous.get(key) != current.get(key) for key in keys)
