@@ -31,7 +31,10 @@
   },
   "audio": {
     "sample_rate": 16000,
-    "chunk_size": 1280
+    "chunk_size": 1280,
+    "input_device_index": null,
+    "output_device_index": null,
+    "local_audio_barge_in": false
   },
   "dashboard": {
     "host": "0.0.0.0",

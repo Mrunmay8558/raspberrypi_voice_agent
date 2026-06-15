@@ -65,6 +65,23 @@ This path uses:
 - an OpenAI-compatible Hermes endpoint
 - local microphone and speaker audio on the Raspberry Pi
 
+For open speaker setups, local barge-in is disabled by default so speaker echo
+does not interrupt the assistant's own response. To allow interruption while
+the assistant is speaking, configure an echo-cancelled OS audio device first:
+
+```bash
+./scripts/setup_audio_aec.sh
+```
+
+Then set:
+
+```bash
+LOCAL_AUDIO_BARGE_IN=true
+```
+
+If needed, pin the local bot to specific PyAudio devices with
+`AUDIO_INPUT_DEVICE_INDEX` and `AUDIO_OUTPUT_DEVICE_INDEX`.
+
 ### Remote Daily mode
 
 In remote mode, the wake listener starts:

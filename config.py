@@ -94,6 +94,19 @@ def _env_int(name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer.") from exc
 
 
+def _env_optional_int(name: str, default: int | None) -> int | None:
+    """Read an optional integer environment override."""
+    value = os.getenv(name)
+    if value is None:
+        value = default
+    if value in {None, ""}:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be an integer or empty.") from exc
+
+
 def _env_float(name: str, default: float) -> float:
     """Read a floating-point environment override."""
     value = os.getenv(name, str(default))
@@ -183,6 +196,18 @@ DEFAULT_INFERENCE_FRAMEWORK = os.getenv(
 
 SAMPLE_RATE = int(_get("audio", "sample_rate", 16000))
 CHUNK_SIZE = int(_get("audio", "chunk_size", 1280))
+AUDIO_INPUT_DEVICE_INDEX = _env_optional_int(
+    "AUDIO_INPUT_DEVICE_INDEX",
+    _get("audio", "input_device_index"),
+)
+AUDIO_OUTPUT_DEVICE_INDEX = _env_optional_int(
+    "AUDIO_OUTPUT_DEVICE_INDEX",
+    _get("audio", "output_device_index"),
+)
+LOCAL_AUDIO_BARGE_IN = _env_bool(
+    "LOCAL_AUDIO_BARGE_IN",
+    bool(_get("audio", "local_audio_barge_in", False)),
+)
 
 DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", str(_get("dashboard", "host", "0.0.0.0")))
 DASHBOARD_PORT = _env_int("DASHBOARD_PORT", int(_get("dashboard", "port", 8080)))

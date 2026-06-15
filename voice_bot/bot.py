@@ -42,10 +42,17 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 from pipecat.transports.local.audio import LocalAudioTransport
 from pipecat.transports.local.audio import LocalAudioTransportParams
+from pipecat.turns.user_mute import AlwaysUserMuteStrategy
+from pipecat.turns.user_start import TranscriptionUserTurnStartStrategy
+from pipecat.turns.user_start import VADUserTurnStartStrategy
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.workers.runner import WorkerRunner
 
+from config import AUDIO_INPUT_DEVICE_INDEX
+from config import AUDIO_OUTPUT_DEVICE_INDEX
 from config import CARTESIA_VOICE_ID
 from config import DEFAULT_OPENAI_MODEL
+from config import LOCAL_AUDIO_BARGE_IN
 from config import OPENAI_BASE_URL
 from config import SAMPLE_RATE
 
@@ -207,6 +214,11 @@ def openai_base_url() -> str:
 
 def create_bot_transport() -> BaseTransport:
     """Create the local audio transport used by the Pipecat pipeline."""
+    logger.info(
+        "Creating local audio transport input_device_index={} output_device_index={}",
+        AUDIO_INPUT_DEVICE_INDEX,
+        AUDIO_OUTPUT_DEVICE_INDEX,
+    )
     return LocalAudioTransport(
         LocalAudioTransportParams(
             audio_in_enabled=True,
@@ -215,7 +227,39 @@ def create_bot_transport() -> BaseTransport:
             audio_out_sample_rate=SAMPLE_RATE,
             audio_in_channels=1,
             audio_out_channels=1,
+            input_device_index=AUDIO_INPUT_DEVICE_INDEX,
+            output_device_index=AUDIO_OUTPUT_DEVICE_INDEX,
         )
+    )
+
+
+def create_user_aggregator_params(user_idle_timeout_secs: float) -> LLMUserAggregatorParams:
+    """Create turn-taking settings for the local microphone path.
+
+    Local speaker setups usually leak bot audio back into the microphone. In
+    the default mode, the bot suppresses barge-in while it is speaking so its
+    own TTS does not interrupt itself. When the OS audio path provides acoustic
+    echo cancellation, set LOCAL_AUDIO_BARGE_IN=true to allow real user
+    interruption during assistant speech.
+    """
+    if LOCAL_AUDIO_BARGE_IN:
+        logger.info("Local audio barge-in enabled; use this only with AEC or a headset")
+        return LLMUserAggregatorParams(
+            user_idle_timeout=user_idle_timeout_secs,
+            vad_analyzer=SileroVADAnalyzer(),
+        )
+
+    logger.info("Local audio barge-in disabled to prevent speaker echo self-interruption")
+    return LLMUserAggregatorParams(
+        user_idle_timeout=user_idle_timeout_secs,
+        vad_analyzer=SileroVADAnalyzer(),
+        user_mute_strategies=[AlwaysUserMuteStrategy()],
+        user_turn_strategies=UserTurnStrategies(
+            start=[
+                VADUserTurnStartStrategy(enable_interruptions=False),
+                TranscriptionUserTurnStartStrategy(enable_interruptions=False),
+            ],
+        ),
     )
 
 
@@ -285,10 +329,7 @@ async def run_bot(
     context = LLMContext(tools=ToolsSchema(standard_tools=[end_call]))
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(
-            user_idle_timeout=user_idle_timeout_secs,
-            vad_analyzer=SileroVADAnalyzer(),
-        ),
+        user_params=create_user_aggregator_params(user_idle_timeout_secs),
     )
 
     # Keep the pipeline linear and explicit: input -> STT -> user context ->
