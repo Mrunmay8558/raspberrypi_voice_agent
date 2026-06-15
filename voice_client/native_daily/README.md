@@ -70,6 +70,11 @@ It then installs the example binary as:
 voice_client/native_daily/bin/pipecat-daily-client
 ```
 
+For the full Raspberry Pi installation and verification flow, including
+`remote_daily` runtime configuration and network troubleshooting, see:
+
+- [docs/pipecat-cpp-client-setup.md](../../docs/pipecat-cpp-client-setup.md)
+
 ## Configuration
 
 Secrets stay in `.env`:

@@ -289,6 +289,7 @@ You must provide the Daily Core SDK path first, typically through
 `DAILY_CORE_PATH`, as described in:
 
 - [voice_client/native_daily/README.md](voice_client/native_daily/README.md)
+- [docs/pipecat-cpp-client-setup.md](docs/pipecat-cpp-client-setup.md)
 
 ## Boot Services
 

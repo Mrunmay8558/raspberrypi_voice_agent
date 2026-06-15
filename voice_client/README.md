@@ -24,3 +24,10 @@ python -m voice_client.runner
 - `session.py`: creates and normalizes Eigi Daily sessions
 - `config_store.py`: loads and persists remote voice settings
 - `native_daily/`: native client binary, config, and build script
+
+## Setup Guide
+
+For Raspberry Pi installation, Daily Core SDK setup, native build commands, and
+runtime verification, see:
+
+- [docs/pipecat-cpp-client-setup.md](../docs/pipecat-cpp-client-setup.md)
