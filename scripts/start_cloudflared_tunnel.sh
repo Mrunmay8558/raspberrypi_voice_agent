@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# Start a Cloudflare quick tunnel only after the local gateway endpoint is
+# reachable. This avoids publishing a dead URL while Hermes is still booting.
+
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${PROJECT_ROOT}/.env"
 
@@ -11,6 +14,8 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
+# Pull the final defaults from `config.py` so the shell wrapper stays aligned
+# with the repository's single configuration source of truth.
 eval "$({ \
   PYTHONPATH="${PROJECT_ROOT}" python3 - <<'PY'
 from config import DEFAULT_CLOUDFLARED_BIN
@@ -47,6 +52,8 @@ fi
 wait_for_gateway() {
   local deadline=$((SECONDS + CLOUDFLARED_WAIT_TIMEOUT_SECS))
 
+  # `/dev/tcp` gives us a dependency-free readiness check before starting the
+  # long-running Cloudflare process.
   while ! (echo > "/dev/tcp/${WAIT_HOST}/${WAIT_PORT}") >/dev/null 2>&1; do
     if (( SECONDS >= deadline )); then
       echo "Timed out waiting for service on ${WAIT_HOST}:${WAIT_PORT}" >&2
